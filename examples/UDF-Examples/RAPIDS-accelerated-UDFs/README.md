@@ -274,7 +274,7 @@ then do the following inside the Docker container.
 
 ### Get jars from Maven Central
 
-[rapids-4-spark_2.12-26.02.0.jar](https://repo1.maven.org/maven2/com/nvidia/rapids-4-spark_2.12/26.02.0/rapids-4-spark_2.12-26.02.0.jar)
+[rapids-4-spark_2.12-26.06.0.jar](https://repo1.maven.org/maven2/com/nvidia/rapids-4-spark_2.12/26.06.0/rapids-4-spark_2.12-26.06.0.jar)
 
 
 ### Launch a local mode Spark

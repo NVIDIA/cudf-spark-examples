@@ -19,4 +19,4 @@ top of the notebook.  After that, select *Run all* to execute the tools for the 
 1. Multiple event logs must be comma-separated. 
    - For example: `/dbfs/path/to/eventlog1,/dbfs/path/to/eventlog2`
 
-**Latest Tools Version Supported** 26.02.0
+**Latest Tools Version Supported** 26.06.0

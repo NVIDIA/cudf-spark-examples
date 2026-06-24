@@ -147,8 +147,8 @@ We use [RAPIDS](https://docs.rapids.ai/install/#get-rapids) for GPU-accelerated 
 ``` shell
 sudo apt install libmysqlclient-dev
 
-conda create -n rapids-26.02 -c rapidsai -c conda-forge -c nvidia  \
-    cudf=26.02 cuml=26.02 python=3.10 'cuda-version>=12.0,<=12.5'
+conda create -n rapids-26.06 -c rapidsai -c conda-forge -c nvidia  \
+    cudf=26.06 cuml=26.06 python=3.10 'cuda-version>=12.0,<=12.5'
 conda activate optuna-spark
 pip install mysqlclient
 pip install optuna joblib joblibspark ipywidgets

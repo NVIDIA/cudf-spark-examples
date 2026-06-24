@@ -74,7 +74,7 @@ services:
       dockerfile: Dockerfile
       args:
         - CUDA_VERSION=${CUDA_VERSION:-12}
-        - RAPIDS_VERSION=${RAPIDS_VERSION:-26.02.0}
+        - RAPIDS_VERSION=${RAPIDS_VERSION:-26.06.0}
         - REPO_URL=${REPO_URL:-https://repo1.maven.org/maven2}
     container_name: spark-connect-server
     hostname: spark-connect-server

@@ -55,7 +55,7 @@ fi
 
 
 # rapids import
-SPARK_RAPIDS_VERSION=26.02.0
+SPARK_RAPIDS_VERSION=26.06.0
 curl -L https://repo1.maven.org/maven2/com/nvidia/rapids-4-spark_2.12/${SPARK_RAPIDS_VERSION}/rapids-4-spark_2.12-${SPARK_RAPIDS_VERSION}.jar -o \
     /databricks/jars/rapids-4-spark_2.12-${SPARK_RAPIDS_VERSION}.jar
 

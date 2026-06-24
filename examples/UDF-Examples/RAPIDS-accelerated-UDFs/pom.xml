@@ -37,7 +37,7 @@
         <cuda.version>cuda12</cuda.version>
         <scala.binary.version>2.12</scala.binary.version>
         <!-- Depends on release version, Snapshot version is not published to the Maven Central -->
-        <rapids4spark.version>26.02.0</rapids4spark.version>
+        <rapids4spark.version>26.06.0</rapids4spark.version>
         <spark.version>3.1.1</spark.version>
         <scala.version>2.12.15</scala.version>
         <udf.native.build.path>${project.build.directory}/cpp-build</udf.native.build.path>

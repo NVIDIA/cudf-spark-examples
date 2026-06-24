@@ -150,7 +150,7 @@ path. Otherwise, we use variables starting with `local_`.
 
 ### Spark Connect Server
 - **Image**: Custom build based on `apache/spark:4.0.0` with Spark RAPIDS ETL and ML Plugins
-- **RAPIDS Version**: 26.02.0 for CUDA 12
+- **RAPIDS Version**: 26.06.0 for CUDA 12
 - **Ports**: 15002 (gRPC), 4040 (Driver UI)
 - **Configuration**: Optimized for GPU acceleration with memory management
 

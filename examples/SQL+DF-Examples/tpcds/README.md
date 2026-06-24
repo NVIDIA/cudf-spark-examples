@@ -23,6 +23,6 @@ Google Colab and connect it to a [GPU instance](https://research.google.com/cola
 </a>
 
 Here is the bar chart from a recent execution on Google Colab's T4 High RAM instance using
-RAPIDS Spark 26.02.0 with Apache Spark 3.5.0
+RAPIDS Spark 26.06.0 with Apache Spark 3.5.0
 
 ![tpcds-speedup](/docs/img/guides/tpcds.png)
