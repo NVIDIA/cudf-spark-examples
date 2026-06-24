@@ -10,7 +10,7 @@ Please refer to the Spark-Rapids-ML [README](https://github.com/NVIDIA/spark-rap
 ## Download RAPIDS Jar from Maven Central
 
 Download the [Spark-Rapids plugin](https://nvidia.github.io/spark-rapids/docs/download.html#download-rapids-accelerator-for-apache-spark-v26060).
-For Spark-RAPIDS-ML version 26.06.0, download the RAPIDS jar from Maven Central: [rapids-4-spark_2.12-26.06.0.jar](https://repo1.maven.org/maven2/com/nvidia/rapids-4-spark_2.12/26.06.0/rapids-4-spark_2.12-26.06.0.jar).
+For Spark-RAPIDS-ML version 26.08.0, download the RAPIDS jar from Maven Central: [rapids-4-spark_2.12-26.08.0.jar](https://repo1.maven.org/maven2/com/nvidia/rapids-4-spark_2.12/26.08.0/rapids-4-spark_2.12-26.08.0.jar).
 
 ## Running the Notebooks
 
