@@ -28,7 +28,7 @@
 #   ./extract-cudf-libs.sh
 #
 # Environment Variables (optional, will use pom.xml values if not set):
-#   RAPIDS4SPARK_VERSION - rapids-4-spark version (e.g., 26.08.0 or 26.08.0-SNAPSHOT)
+#   RAPIDS4SPARK_VERSION - rapids-4-spark version (e.g., 26.10.0 or 26.10.0-SNAPSHOT)
 #   SCALA_VERSION        - Scala binary version (e.g., 2.12, 2.13)
 #   CUDA_VERSION         - CUDA version (e.g., cuda11, cuda12)
 #   CUDF_BRANCH          - cuDF git branch for headers (e.g., main, branch-26.06)
