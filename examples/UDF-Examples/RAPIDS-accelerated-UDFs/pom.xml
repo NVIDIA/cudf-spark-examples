@@ -413,6 +413,16 @@
                                                   message="Failed to extract libcudf.so from jar"/>
 
                                             <echo message="✓ libcudf.so extracted to: ${project.build.directory}/native-deps"/>
+
+                                            <!-- Resolve matching cuDF/RMM/CCCL pins from the spark-rapids-jni
+                                                 revision embedded in the rapids-4-spark jar. -->
+                                            <chmod file="${basedir}/resolve-jni-cudf-pins.sh" perm="755"/>
+                                            <exec executable="${basedir}/resolve-jni-cudf-pins.sh" failonerror="true">
+                                                <arg value="${rapids.jar.path}"/>
+                                                <arg value="${project.build.directory}/cudf-pins"/>
+                                                <arg value="${project.build.directory}/jar-native-deps.properties"/>
+                                            </exec>
+                                            <property file="${project.build.directory}/jar-native-deps.properties"/>
                                             
                                             <!-- Clone cuDF repo for headers only (shallow clone) -->
                                             <!-- Ensure script is executable -->
@@ -421,7 +431,7 @@
                                             <!-- Execute script to clone/update cuDF repository -->
                                             <exec executable="${basedir}/clone-cudf-repo.sh" failonerror="true">
                                                 <arg value="${project.build.directory}/cudf-repo"/>
-                                                <arg value="${cudf.git.branch}"/>
+                                                <arg value="${jar.cudf.revision}"/>
                                             </exec>
 
                                             <!-- Verify cuDF headers exist after clone/update -->
@@ -451,6 +461,20 @@
                                 <phase>compile</phase>
                                 <configuration>
                                     <target>
+                                        <available file="${project.build.directory}/jar-native-deps.properties"
+                                                   property="jar.native.deps.properties.exists"/>
+                                        <condition property="prebuilt.cudf.requested">
+                                            <equals arg1="${USE_PREBUILT_CUDF}" arg2="ON"/>
+                                        </condition>
+                                        <fail if:set="prebuilt.cudf.requested"
+                                              unless:set="jar.native.deps.properties.exists"
+                                              xmlns:if="ant:if"
+                                              xmlns:unless="ant:unless"
+                                              message="Prebuilt cuDF requires ${project.build.directory}/jar-native-deps.properties. Run dependency extraction first or set USE_PREBUILT_CUDF=OFF."/>
+                                        <property file="${project.build.directory}/jar-native-deps.properties"/>
+                                        <property name="jar.rapids.cmake.sha" value="main"/>
+                                        <property name="jar.rapids.cmake.file" value=""/>
+                                        <property name="jar.cudf.pins.file" value=""/>
                                         <mkdir dir="${udf.native.build.path}"/>
                                         <exec dir="${udf.native.build.path}"
                                               failonerror="true"
@@ -462,6 +486,9 @@
                                             <arg value="-DPER_THREAD_DEFAULT_STREAM=${PER_THREAD_DEFAULT_STREAM}"/>
                                             <arg value="-DCUDF_ENABLE_ARROW_S3=${CUDF_ENABLE_ARROW_S3}"/>
                                             <arg value="-DUSE_PREBUILT_CUDF=${USE_PREBUILT_CUDF}"/>
+                                            <arg value="-DRAPIDS_CMAKE_BRANCH=${jar.rapids.cmake.sha}"/>
+                                            <arg value="-DRAPIDS_CMAKE_FILE=${jar.rapids.cmake.file}"/>
+                                            <arg value="-DRAPIDS_CMAKE_CPM_OVERRIDE_VERSION_FILE=${jar.cudf.pins.file}"/>
                                         </exec>
                                         <exec failonerror="true"
                                               executable="cmake">

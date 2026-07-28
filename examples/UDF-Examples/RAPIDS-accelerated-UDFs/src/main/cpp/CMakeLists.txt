@@ -17,12 +17,31 @@
 # Keep the same with https://github.com/rapidsai/rapids-cmake/blob/main/RAPIDS.cmake
 cmake_minimum_required(VERSION 4.0 FATAL_ERROR)
 
-# set to the rapids-cmake-branch
-set(rapids-cmake-branch "main")
+set(RAPIDS_CMAKE_BRANCH "main" CACHE STRING
+    "rapids-cmake branch, tag, or commit to use for native dependencies")
+set(RAPIDS_CMAKE_FILE "" CACHE FILEPATH
+    "Path to a pre-downloaded RAPIDS.cmake entrypoint")
+set(RAPIDS_CMAKE_CPM_OVERRIDE_VERSION_FILE "" CACHE FILEPATH
+    "rapids-cmake versions.json override matching the prebuilt libcudf.so")
+string(LENGTH "${RAPIDS_CMAKE_BRANCH}" RAPIDS_CMAKE_REF_LENGTH)
+if(RAPIDS_CMAKE_REF_LENGTH EQUAL 40 AND RAPIDS_CMAKE_BRANCH MATCHES "^[0-9a-fA-F]+$")
+    set(rapids-cmake-branch "main")
+    set(rapids-cmake-sha "${RAPIDS_CMAKE_BRANCH}")
+    set(rapids-cmake-fetch-via-git ON)
+else()
+    set(rapids-cmake-branch "${RAPIDS_CMAKE_BRANCH}")
+endif()
 
-file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/${rapids-cmake-branch}/RAPIDS.cmake
-     ${CMAKE_BINARY_DIR}/RAPIDS.cmake)
-include(${CMAKE_BINARY_DIR}/RAPIDS.cmake)
+if(RAPIDS_CMAKE_FILE)
+    if(NOT EXISTS "${RAPIDS_CMAKE_FILE}")
+        message(FATAL_ERROR "RAPIDS_CMAKE_FILE does not exist: ${RAPIDS_CMAKE_FILE}")
+    endif()
+    include("${RAPIDS_CMAKE_FILE}")
+else()
+    file(DOWNLOAD https://raw.githubusercontent.com/rapidsai/rapids-cmake/${RAPIDS_CMAKE_BRANCH}/RAPIDS.cmake
+         ${CMAKE_BINARY_DIR}/RAPIDS.cmake)
+    include(${CMAKE_BINARY_DIR}/RAPIDS.cmake)
+endif()
 
 include(rapids-cmake)
 include(rapids-cpm)
@@ -51,6 +70,16 @@ if(NOT EXISTS "${rapids-cmake-dir}")
 endif()
 
 message(STATUS "rapids-cmake directory: ${rapids-cmake-dir}")
+message(STATUS "rapids-cmake ref: ${RAPIDS_CMAKE_BRANCH}")
+
+if(RAPIDS_CMAKE_CPM_OVERRIDE_VERSION_FILE)
+    if(NOT EXISTS "${RAPIDS_CMAKE_CPM_OVERRIDE_VERSION_FILE}")
+        message(FATAL_ERROR
+            "RAPIDS_CMAKE_CPM_OVERRIDE_VERSION_FILE does not exist: "
+            "${RAPIDS_CMAKE_CPM_OVERRIDE_VERSION_FILE}")
+    endif()
+    message(STATUS "Using rapids-cmake package override: ${RAPIDS_CMAKE_CPM_OVERRIDE_VERSION_FILE}")
+endif()
 
 # Use GPU_ARCHS if it is defined
 if(DEFINED GPU_ARCHS)
@@ -249,7 +278,11 @@ if(SHOULD_USE_PREBUILT)
     # First, let rapids-cpm fetch the dependencies that cuDF needs
     message(STATUS "Fetching cuDF dependencies (this may take a few minutes)...")
     
-    rapids_cpm_init()
+    if(RAPIDS_CMAKE_CPM_OVERRIDE_VERSION_FILE)
+        rapids_cpm_init(OVERRIDE "${RAPIDS_CMAKE_CPM_OVERRIDE_VERSION_FILE}")
+    else()
+        rapids_cpm_init()
+    endif()
     
     # Set options to avoid building unnecessary components
     set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -302,8 +335,9 @@ if(SHOULD_USE_PREBUILT)
     target_include_directories(cudf_imported INTERFACE
         ${CUDF_INCLUDE_DIR}
         ${RMM_INCLUDE_DIR}
+        ${CUDAToolkit_INCLUDE_DIRS}
     )
-    
+
     # Link against RMM to get other dependencies
     target_link_libraries(cudf_imported INTERFACE rmm::rmm)
     
@@ -325,7 +359,7 @@ else()
     rapids_cpm_find(cudf 26.10.00
             CPM_ARGS
             GIT_REPOSITORY  https://github.com/rapidsai/cudf.git
-            GIT_TAG         ${rapids-cmake-branch}
+            GIT_TAG         ${RAPIDS_CMAKE_BRANCH}
             GIT_SHALLOW     TRUE
             SOURCE_SUBDIR   cpp
             OPTIONS         "BUILD_TESTS OFF"

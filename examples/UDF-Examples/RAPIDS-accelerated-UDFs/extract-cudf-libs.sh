@@ -28,19 +28,20 @@
 #   ./extract-cudf-libs.sh
 #
 # Environment Variables (optional, will use pom.xml values if not set):
+#   RAPIDS_JAR_PATH      - explicit rapids-4-spark jar path
 #   RAPIDS4SPARK_VERSION - rapids-4-spark version (e.g., 26.10.0 or 26.10.0-SNAPSHOT)
 #   SCALA_VERSION        - Scala binary version (e.g., 2.12, 2.13)
 #   CUDA_VERSION         - CUDA version (e.g., cuda11, cuda12)
-#   CUDF_BRANCH          - cuDF git branch for headers (e.g., main, branch-26.06)
+#   CUDF_BRANCH          - cuDF git branch for headers (e.g., main, branch-26.08)
 #
 # Example with overrides:
-#   RAPIDS4SPARK_VERSION=26.06.0 CUDA_VERSION=cuda11 ./extract-cudf-libs.sh
+#   RAPIDS4SPARK_VERSION=26.08.0 CUDA_VERSION=cuda12 ./extract-cudf-libs.sh
 ###############################################################################
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TARGET_DIR="$SCRIPT_DIR/target"
+TARGET_DIR="${TARGET_DIR:-$SCRIPT_DIR/target}"
 NATIVE_DEPS_DIR="$TARGET_DIR/native-deps"
 CUDF_REPO_DIR="$TARGET_DIR/cudf-repo"
 POM_FILE="$SCRIPT_DIR/pom.xml"
@@ -50,6 +51,11 @@ POM_FILE="$SCRIPT_DIR/pom.xml"
 extract_pom_property() {
     local property_name="$1"
     local value
+
+    if [ ! -f "$POM_FILE" ]; then
+        echo ""
+        return
+    fi
     
     # Use xmllint if available (more reliable)
     if command -v xmllint >/dev/null 2>&1; then
@@ -109,10 +115,16 @@ JAR_PATH_WITH_CLASSIFIER="$MAVEN_REPO/com/nvidia/rapids-4-spark_${SCALA_VERSION}
 JAR_PATH_NO_CLASSIFIER="$MAVEN_REPO/com/nvidia/rapids-4-spark_${SCALA_VERSION}/${RAPIDS4SPARK_VERSION}/rapids-4-spark_${SCALA_VERSION}-${RAPIDS4SPARK_VERSION}.jar"
 
 echo "Looking for rapids-4-spark jar..."
+if [ -n "${RAPIDS_JAR_PATH:-}" ]; then
+    echo "  Explicit path: $RAPIDS_JAR_PATH"
+fi
 echo "  Pattern 1 (with classifier): $JAR_PATH_WITH_CLASSIFIER"
 echo "  Pattern 2 (no classifier):   $JAR_PATH_NO_CLASSIFIER"
 
-if [ -f "$JAR_PATH_WITH_CLASSIFIER" ]; then
+if [ -n "${RAPIDS_JAR_PATH:-}" ] && [ -f "$RAPIDS_JAR_PATH" ]; then
+    JAR_PATH="$RAPIDS_JAR_PATH"
+    echo "✓ Found jar (explicit path): $JAR_PATH"
+elif [ -f "$JAR_PATH_WITH_CLASSIFIER" ]; then
     JAR_PATH="$JAR_PATH_WITH_CLASSIFIER"
     echo "✓ Found jar (with classifier): $JAR_PATH"
 elif [ -f "$JAR_PATH_NO_CLASSIFIER" ]; then
@@ -122,6 +134,9 @@ else
     echo ""
     echo "ERROR: rapids-4-spark jar not found!"
     echo "Tried:"
+    if [ -n "${RAPIDS_JAR_PATH:-}" ]; then
+        echo "  $RAPIDS_JAR_PATH"
+    fi
     echo "  $JAR_PATH_WITH_CLASSIFIER"
     echo "  $JAR_PATH_NO_CLASSIFIER"
     echo ""
@@ -232,15 +247,22 @@ fi
 echo "✓ Successfully extracted libraries to: $NATIVE_DEPS_DIR"
 ls -lh "$NATIVE_DEPS_DIR"
 
+PINS_DIR="$TARGET_DIR/cudf-pins"
+PINS_PROPERTIES="$TARGET_DIR/jar-native-deps.properties"
+"$SCRIPT_DIR/resolve-jni-cudf-pins.sh" "$JAR_PATH" "$PINS_DIR" "$PINS_PROPERTIES"
+RESOLVED_CUDF_REF=$(awk -F= '$1 == "jar.cudf.revision" {print $2; exit}' "$PINS_PROPERTIES")
+if [ -z "$RESOLVED_CUDF_REF" ]; then
+    echo "ERROR: Failed to resolve cuDF revision from $PINS_PROPERTIES" >&2
+    exit 1
+fi
+
 # Clone cuDF repo for headers (shallow clone)
 if [ ! -d "$CUDF_REPO_DIR/.git" ]; then
     echo "Cloning cuDF repository for headers..."
-    git clone --depth 1 --branch "$CUDF_BRANCH" https://github.com/rapidsai/cudf.git "$CUDF_REPO_DIR"
-    echo "✓ Cloned cuDF repo to: $CUDF_REPO_DIR"
 else
     echo "✓ cuDF repo already exists at: $CUDF_REPO_DIR"
-    echo "  (Delete it to re-clone: rm -rf \"$CUDF_REPO_DIR\")"
 fi
+"$SCRIPT_DIR/clone-cudf-repo.sh" "$CUDF_REPO_DIR" "$RESOLVED_CUDF_REF"
 
 echo ""
 echo "=================================================="

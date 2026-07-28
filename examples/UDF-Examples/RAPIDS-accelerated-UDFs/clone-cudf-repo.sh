@@ -22,11 +22,11 @@
 # headers needed for compiling native UDF code.
 #
 # Usage:
-#   clone-cudf-repo.sh <target_directory> <branch_name>
+#   clone-cudf-repo.sh <target_directory> <git_ref>
 #
 # Arguments:
 #   target_directory - Directory where cuDF repo will be cloned
-#   branch_name      - Git branch to clone/checkout
+#   git_ref          - Git branch, tag, or commit to checkout
 #
 # Exit codes:
 #   0 - Success
@@ -38,79 +38,88 @@ set -o pipefail
 
 # Parse arguments
 if [ $# -ne 2 ]; then
-    echo "ERROR: Usage: $0 <target_directory> <branch_name>" >&2
+    echo "ERROR: Usage: $0 <target_directory> <git_ref>" >&2
     exit 1
 fi
 
 CUDF_DIR="$1"
-BRANCH="$2"
+GIT_REF="$2"
+GIT=(git -c "safe.directory=$CUDF_DIR")
 
 echo "================================================"
 echo "cuDF Repository Management"
 echo "  Target directory: $CUDF_DIR"
-echo "  Branch: $BRANCH"
+echo "  Git ref: $GIT_REF"
 echo "================================================"
 
 # Check if repository already exists
 if [ ! -d "$CUDF_DIR/.git" ]; then
     # Repository doesn't exist - clone it
-    echo "Cloning cuDF repository ($BRANCH branch)..."
+    echo "Cloning cuDF repository..."
     
-    git clone --depth 1 --branch "$BRANCH" \
-        https://github.com/rapidsai/cudf.git "$CUDF_DIR" || {
-        echo "ERROR: Failed to clone cuDF from branch $BRANCH" >&2
+    "${GIT[@]}" clone --filter=blob:none --no-checkout https://github.com/rapidsai/cudf.git "$CUDF_DIR" || {
+        echo "ERROR: Failed to clone cuDF repository" >&2
         echo "Please check:" >&2
         echo "  1. Network connectivity to GitHub" >&2
-        echo "  2. Branch '$BRANCH' exists in cuDF repository" >&2
         exit 1
     }
-    
-    echo "✓ Successfully cloned cuDF repository"
-else
-    # Repository exists - verify and update if needed
-    echo "cuDF repository exists, verifying branch..."
+
     cd "$CUDF_DIR" || {
         echo "ERROR: Cannot access directory $CUDF_DIR" >&2
         exit 1
     }
-    
-    # Get current branch
-    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
-    
-    if [ "$CURRENT_BRANCH" != "$BRANCH" ]; then
-        # Branch mismatch - fetch and switch to correct branch
-        echo "Branch mismatch detected:"
-        echo "  Current branch: $CURRENT_BRANCH"
-        echo "  Expected branch: $BRANCH"
-        echo "Fetching and switching to $BRANCH..."
-        
-        git fetch --depth 1 origin "$BRANCH" || {
-            echo "ERROR: Failed to fetch branch $BRANCH from origin" >&2
-            echo "Please check:" >&2
-            echo "  1. Network connectivity to GitHub" >&2
-            echo "  2. Branch '$BRANCH' exists in cuDF repository" >&2
+
+    "${GIT[@]}" fetch --depth 1 origin "$GIT_REF" || {
+        echo "ERROR: Failed to fetch cuDF ref $GIT_REF from origin" >&2
+        echo "Please check:" >&2
+        echo "  1. Network connectivity to GitHub" >&2
+        echo "  2. Ref '$GIT_REF' exists in cuDF repository" >&2
+        exit 1
+    }
+
+    "${GIT[@]}" checkout --detach FETCH_HEAD || {
+        echo "ERROR: Failed to checkout cuDF ref $GIT_REF" >&2
+        exit 1
+    }
+
+    echo "✓ Successfully cloned cuDF repository"
+else
+    # Repository exists - verify and update if needed
+    echo "cuDF repository exists, verifying ref..."
+    cd "$CUDF_DIR" || {
+        echo "ERROR: Cannot access directory $CUDF_DIR" >&2
+        exit 1
+    }
+
+    CURRENT_COMMIT=$("${GIT[@]}" rev-parse HEAD 2>/dev/null || echo "unknown")
+
+    "${GIT[@]}" fetch --depth 1 origin "$GIT_REF" || {
+        echo "ERROR: Failed to fetch cuDF ref $GIT_REF from origin" >&2
+        echo "Please check:" >&2
+        echo "  1. Network connectivity to GitHub" >&2
+        echo "  2. Ref '$GIT_REF' exists in cuDF repository" >&2
+        exit 1
+    }
+
+    FETCHED_COMMIT=$("${GIT[@]}" rev-parse FETCH_HEAD)
+
+    if [ "$CURRENT_COMMIT" != "$FETCHED_COMMIT" ]; then
+        echo "cuDF ref mismatch detected:"
+        echo "  Current commit: $CURRENT_COMMIT"
+        echo "  Expected commit: $FETCHED_COMMIT ($GIT_REF)"
+        "${GIT[@]}" checkout --detach FETCH_HEAD || {
+            echo "ERROR: Failed to checkout cuDF ref $GIT_REF" >&2
             exit 1
         }
-        
-        git checkout "$BRANCH" || {
-            echo "ERROR: Failed to checkout branch $BRANCH" >&2
-            exit 1
-        }
-        
-        git reset --hard "origin/$BRANCH" || {
-            echo "ERROR: Failed to reset to origin/$BRANCH" >&2
-            exit 1
-        }
-        
-        echo "✓ Switched to branch $BRANCH"
+        echo "✓ Switched cuDF repository to $GIT_REF"
     else
-        echo "✓ Already on correct branch ($BRANCH)"
+        echo "✓ Already on correct cuDF ref ($GIT_REF)"
     fi
 fi
 
 echo "================================================"
 echo "✓ cuDF repository ready at: $CUDF_DIR"
-echo "  Branch: $BRANCH"
+echo "  Git ref: $GIT_REF"
 echo "================================================"
 
 exit 0

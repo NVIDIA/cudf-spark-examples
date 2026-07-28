@@ -146,7 +146,10 @@ mvn clean package -Pudf-native-examples
 
 The build will automatically:
 - Extract `libcudf.so` from the rapids-4-spark jar
-- Clone cuDF repository for headers (shallow clone)
+- Read the embedded `spark-rapids-jni` and `cudf-java` version metadata from the jar
+- Download the matching `spark-rapids-jni` `cudf-pins` files
+- Clone the cuDF repository at the revision recorded in the jar
+- Configure rapids-cmake with the matching `rapids-cmake` sha and package override file
 - Build only your UDF native code against the prebuilt library
 
 **Native ABI compatibility note:**
@@ -160,12 +163,11 @@ the UDF may fail with undefined symbols or crash when Spark loads the native
 library.
 
 When changing the rapids-4-spark jar version, rebuild the native UDFs with
-matching cuDF/RMM/CCCL headers and libraries. For snapshot or locally built
-jars, make sure `cudf.git.branch`, the rapids-cmake branch in
-`src/main/cpp/CMakeLists.txt`, and the RMM/CCCL versions resolved by
-rapids-cmake correspond to the same source state used to build the jar. After
-changing these values, remove `target/native-deps` and `target/cudf-repo`
-before rebuilding so stale headers or libraries are not reused.
+matching cuDF/RMM/CCCL headers and libraries. In prebuilt mode, the Maven build
+derives those native dependency pins from the `spark-rapids-jni` revision
+recorded in the jar. After changing jar versions, remove `target/native-deps`,
+`target/cudf-repo`, `target/cudf-pins`, and `target/cpp-build` before
+rebuilding so stale headers, pins, or libraries are not reused.
 
 **Or manually extract first:**
 ```bash
@@ -217,7 +219,7 @@ You can customize the build by passing Maven system properties via `-D<property>
 | `BUILD_UDF_BENCHMARKS` | `OFF` | Build benchmark executables |
 | `PER_THREAD_DEFAULT_STREAM` | `ON` | Enable per-thread default CUDA streams |
 | `CUDF_ENABLE_ARROW_S3` | `OFF` | Enable Arrow S3 support in cuDF |
-| `cudf.git.branch` | `main` | cuDF git branch to clone for headers |
+| `cudf.git.branch` | `main` | cuDF git branch to clone for source builds or fallback paths |
 | `skipCudfExtraction` | `false` | Skip extracting cuDF dependencies from jar |
 
 **Example usage:**
