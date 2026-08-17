@@ -25,7 +25,7 @@ import com.nvidia.spark.RapidsUDF
  * A Scala user-defined function (UDF) that URL-encodes strings.
  * This class demonstrates how to implement a Scala UDF that also
  * provides a RAPIDS implementation that can run on the GPU when the query
- * is executed with the RAPIDS Accelerator for Apache Spark.
+ * is executed with the NVIDIA cuDF plugin for Apache Spark.
  */
 class URLEncode extends Function[String, String] with RapidsUDF with Serializable {
   /** Row-by-row implementation that executes on the CPU */

@@ -74,7 +74,7 @@ We provide **2 notebooks**, with differences in the backend/implementation. See 
 - `optuna-dataframe.ipynb`: 
   - Uses Spark dataframes to distribute tasks on the cluster. 
   - Implements *Spark-I/O*, where Spark reads the dataset from a specified filepath, then duplicates and repartitions it so that each worker task is mapped onto a copy of the dataset.
-  - Dataframe operations are accelerated on GPU with the [Spark-RAPIDS Accelerator](https://nvidia.github.io/spark-rapids/).
+  - Dataframe operations are accelerated on GPU with the [NVIDIA cuDF plugin for Apache Spark](https://nvidia.github.io/cudf-spark/).
 
 ## Running Optuna on Spark Standalone
 
@@ -201,7 +201,7 @@ Or, create a cluster via the web UI:
 - Under `Advanced Options > Spark > Environment variables`, set `LIBCUDF_CUFILE_POLICY=OFF`.
 - Make sure to use a GPU cluster and include task GPU resources.
 
-The init script will install the required libraries on all nodes, including RAPIDS and the Spark-RAPIDS plugin for GPU-accelerated ETL. On the driver, it will setup the MySQL server backend. 
+The init script will install the required libraries on all nodes, including RAPIDS and the cuDF plugin for GPU-accelerated ETL. On the driver, it will setup the MySQL server backend.
 
 ### 3. Run Notebook
 

@@ -141,7 +141,7 @@ else
     echo "  $JAR_PATH_NO_CLASSIFIER"
     echo ""
     echo "For SNAPSHOT versions:"
-    echo "  cd /path/to/spark-rapids"
+    echo "  cd /path/to/cudf-spark"
     echo "  mvn clean install -DskipTests"
     echo ""
     echo "For release versions:"
