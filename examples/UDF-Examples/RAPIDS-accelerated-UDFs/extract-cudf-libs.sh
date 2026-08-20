@@ -35,7 +35,7 @@
 #   CUDF_BRANCH          - cuDF git branch for headers (e.g., main, branch-26.08)
 #
 # Example with overrides:
-#   RAPIDS4SPARK_VERSION=26.08.0 CUDA_VERSION=cuda12 ./extract-cudf-libs.sh
+#   RAPIDS4SPARK_VERSION=26.10.0 CUDA_VERSION=cuda12 ./extract-cudf-libs.sh
 ###############################################################################
 
 set -e
