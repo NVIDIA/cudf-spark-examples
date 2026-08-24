@@ -1,4 +1,4 @@
-# TPC-DS Scale Factor 10 (GiB) - CPU Spark vs GPU Spark
+# TPC-DS Scale Factor 10 (GiB) - CPU Spark vs NVIDIA cuDF plugin for Apache Spark
 
 [TPC-DS](https://www.tpc.org/tpcds/) is a decision support benchmark often used to evaluate
 performance of OLAP Databases and Big Data systems.
@@ -7,7 +7,7 @@ The notebook in this folder runs a user-specified subset of the TPC-DS queries o
 Scale Factor 10 (GiB) dataset. It uses [TPCDS PySpark](https://github.com/cerndb/SparkTraining/blob/master/notebooks/TPCDS_PySpark_CERN_SWAN_getstarted.ipynb)
 to execute TPC-DS queries with SparkSQL on GPU and CPU capturing the metrics
 as a Pandas dataframe. It then plots a comparison bar chart visualizing
-the GPU acceleration achieved for the queries run with RAPIDS Spark in this
+the GPU acceleration achieved for the queries run with the cuDF plugin in this
 very notebook.
 
 This notebook can be opened and executed using standard
@@ -23,6 +23,6 @@ Google Colab and connect it to a [GPU instance](https://research.google.com/cola
 </a>
 
 Here is the bar chart from a recent execution on Google Colab's T4 High RAM instance using
-RAPIDS Spark 26.06.0 with Apache Spark 3.5.0
+the cuDF plugin 26.08.0 with Apache Spark 3.5.0
 
 ![tpcds-speedup](/docs/img/guides/tpcds.png)

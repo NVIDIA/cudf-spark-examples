@@ -1,12 +1,12 @@
-# RAPIDS Accelerated UDF Examples
+# NVIDIA cuDF plugin for Apache Spark UDF Examples
 
-This project contains sample implementations of RAPIDS accelerated user-defined functions.
+This project contains sample implementations of GPU-accelerated user-defined functions for the cuDF plugin.
 
 The ideal solution would be to replace the UDF with a series of DataFrame or SQL operations. If that
 is not possible, we also provide
-a [UDF compiler extension](https://nvidia.github.io/spark-rapids/docs/additional-functionality/udf-to-catalyst-expressions.html)
+a [UDF compiler extension](https://nvidia.github.io/cudf-spark/docs/additional-functionality/udf-to-catalyst-expressions.html)
 to translate UDFs to Catalyst expressions. The extension is limited to only support compiling simple
-operations. For complicated cases, you can choose to implement a RAPIDS accelerated UDF.
+operations. For complicated cases, you can choose to implement a GPU-accelerated UDF for the cuDF plugin.
 
 ## Spark Scala UDF Examples
 
@@ -23,7 +23,7 @@ implement via the Java API is ease of development, but the memory model is not f
 GPU operations because the JVM makes the assumption that everything we're trying to do is in heap
 memory. We need to free the GPU resources in a timely manner with try-finally blocks. Note that we
 need to implement both CPU and GPU functions so the UDF will still work if a higher-level operation
-involving the RAPIDS accelerated UDF falls back to the CPU.
+involving the GPU-accelerated UDF for the cuDF plugin falls back to the CPU.
 
 - [URLDecode](src/main/scala/com/nvidia/spark/rapids/udf/scala/URLDecode.scala)
   decodes URL-encoded strings using the
@@ -34,7 +34,7 @@ involving the RAPIDS accelerated UDF falls back to the CPU.
 
 ## Spark Java UDF Examples
 
-Below are some examples for implementing RAPIDS accelerated Scala UDF via JNI and native code. If
+Below are some examples for implementing GPU-accelerated Scala UDFs for the cuDF plugin via JNI and native code. If
 there is no existing simple Java API we could leverage, we can write native custom code.
 Take [CosineSimilarity](src/main/java/com/nvidia/spark/rapids/udf/java/CosineSimilarity.java) as the
 example, the Java class for the UDF is similar as the previous URLDecode/URLEncode demo. We need to
@@ -48,7 +48,7 @@ we can leverage the [Thrust template library](https://docs.nvidia.com/cuda/thrus
 write the standard algorithms for GPU parallelizing code. The benefit of implementing the UDF in
 native code is for maximum control over GPU memory utilization and performance. However the
 trade-off is a more complicated build environment, as we need to build against libcudf with
-significantly longer build times. Implementing a RAPIDS accelerated UDF in native code is a
+significantly longer build times. Implementing a GPU-accelerated UDF for the cuDF plugin in native code is a
 significant effort.
 
 - [URLDecode](src/main/java/com/nvidia/spark/rapids/udf/java/URLDecode.java)
@@ -63,7 +63,7 @@ significant effort.
 
 ## Hive UDF Examples
 
-Below are some examples for implementing RAPIDS accelerated Hive UDF via JNI and native code.
+Below are some examples for implementing GPU-accelerated Hive UDFs for the cuDF plugin via JNI and native code.
 
 - [URLDecode](src/main/java/com/nvidia/spark/rapids/udf/hive/URLDecode.java)
   implements a Hive simple UDF using the
@@ -274,7 +274,7 @@ then do the following inside the Docker container.
 
 ### Get jars from Maven Central
 
-[rapids-4-spark_2.12-26.06.0.jar](https://repo1.maven.org/maven2/com/nvidia/rapids-4-spark_2.12/26.06.0/rapids-4-spark_2.12-26.06.0.jar)
+[rapids-4-spark_2.12-26.08.0.jar](https://repo1.maven.org/maven2/com/nvidia/rapids-4-spark_2.12/26.08.0/rapids-4-spark_2.12-26.08.0.jar)
 
 
 ### Launch a local mode Spark

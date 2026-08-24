@@ -20,10 +20,9 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.nvidia</groupId>
     <artifactId>rapids-4-spark-udf-examples_2.12</artifactId>
-    <name>RAPIDS Accelerator for Apache Spark UDF Examples</name>
-    <description>Sample implementations of RAPIDS accelerated
-        user defined functions for use with the RAPIDS Accelerator
-        for Apache Spark
+    <name>NVIDIA cuDF plugin for Apache Spark UDF Examples</name>
+    <description>Sample implementations of GPU-accelerated user-defined functions
+        for use with the NVIDIA cuDF plugin for Apache Spark
     </description>
     <version>26.08.0-SNAPSHOT</version>
 
@@ -37,7 +36,7 @@
         <cuda.version>cuda12</cuda.version>
         <scala.binary.version>2.12</scala.binary.version>
         <!-- Depends on release version, Snapshot version is not published to the Maven Central -->
-        <rapids4spark.version>26.06.0</rapids4spark.version>
+        <rapids4spark.version>26.08.0</rapids4spark.version>
         <spark.version>3.1.1</spark.version>
         <scala.version>2.12.15</scala.version>
         <udf.native.build.path>${project.build.directory}/cpp-build</udf.native.build.path>
@@ -370,8 +369,8 @@
                                             <echo message="      SNAPSHOT versions typically do not use classifier" level="warning"/>
                                             <echo message="" level="warning"/>
                                             <echo message="For SNAPSHOT versions:" level="warning"/>
-                                            <echo message="  1. Build spark-rapids locally:" level="warning"/>
-                                            <echo message="     cd /path/to/spark-rapids" level="warning"/>
+                                            <echo message="  1. Build cudf-spark locally:" level="warning"/>
+                                            <echo message="     cd /path/to/cudf-spark" level="warning"/>
                                             <echo message="     mvn clean install -DskipTests" level="warning"/>
                                             <echo message="" level="warning"/>
                                             <echo message="FALLING BACK to building cuDF from source..." level="warning"/>

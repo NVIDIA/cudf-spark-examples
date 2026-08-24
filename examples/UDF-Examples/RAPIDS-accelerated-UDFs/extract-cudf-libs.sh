@@ -31,10 +31,10 @@
 #   RAPIDS4SPARK_VERSION - rapids-4-spark version (e.g., 26.08.0 or 26.08.0-SNAPSHOT)
 #   SCALA_VERSION        - Scala binary version (e.g., 2.12, 2.13)
 #   CUDA_VERSION         - CUDA version (e.g., cuda11, cuda12)
-#   CUDF_BRANCH          - cuDF git branch for headers (e.g., main, branch-26.06)
+#   CUDF_BRANCH          - cuDF git branch for headers (e.g., main, branch-26.08)
 #
 # Example with overrides:
-#   RAPIDS4SPARK_VERSION=26.06.0 CUDA_VERSION=cuda11 ./extract-cudf-libs.sh
+#   RAPIDS4SPARK_VERSION=26.08.0 CUDA_VERSION=cuda11 ./extract-cudf-libs.sh
 ###############################################################################
 
 set -e
@@ -126,7 +126,7 @@ else
     echo "  $JAR_PATH_NO_CLASSIFIER"
     echo ""
     echo "For SNAPSHOT versions:"
-    echo "  cd /path/to/spark-rapids"
+    echo "  cd /path/to/cudf-spark"
     echo "  mvn clean install -DskipTests"
     echo ""
     echo "For release versions:"

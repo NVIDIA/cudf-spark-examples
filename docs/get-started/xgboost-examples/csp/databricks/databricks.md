@@ -15,13 +15,13 @@ The number of GPUs per node dictates the number of Spark executors that can run 
 Start A Databricks Cluster
 --------------------------
 Before creating the cluster, we will need to create an [initialization script](https://docs.databricks.com/clusters/init-scripts.html) for the 
-cluster to install the RAPIDS jars. Databricks recommends storing all cluster-scoped init scripts using workspace files. 
+cluster to install the NVIDIA cuDF plugin for Apache Spark jar. Databricks recommends storing all cluster-scoped init scripts using workspace files.
 Each user has a Home directory configured under the /Users directory in the workspace. 
 Navigate to your home directory in the UI and select **Create** > **File** from the menu, 
 create an `init.sh` scripts with contents:   
    ```bash
    #!/bin/bash
-   sudo wget -O /databricks/jars/rapids-4-spark_2.12-26.06.0.jar https://repo1.maven.org/maven2/com/nvidia/rapids-4-spark_2.12/26.06.0/rapids-4-spark_2.12-26.06.0.jar
+   sudo wget -O /databricks/jars/rapids-4-spark_2.12-26.08.0.jar https://repo1.maven.org/maven2/com/nvidia/rapids-4-spark_2.12/26.08.0/rapids-4-spark_2.12-26.08.0.jar
    ```
 1. Select the Databricks Runtime Version from one of the supported runtimes specified in the
    Prerequisites section.
@@ -34,8 +34,7 @@ create an `init.sh` scripts with contents:
    ![Init Script](../../../../img/databricks/initscript.png)
 6. Now select the “Spark” tab, and paste the following config options into the Spark Config section.
    Change the config values based on the workers you choose. See Apache Spark
-   [configuration](https://spark.apache.org/docs/latest/configuration.html) and RAPIDS Accelerator
-   for Apache Spark [descriptions](https://nvidia.github.io/spark-rapids/docs/configs.html) for each config.
+   [configuration](https://spark.apache.org/docs/latest/configuration.html) and the cuDF plugin [configuration descriptions](https://nvidia.github.io/cudf-spark/docs/configs.html) for each config.
 
     The
     [`spark.task.resource.gpu.amount`](https://spark.apache.org/docs/latest/configuration.html#scheduling)
@@ -60,15 +59,15 @@ create an `init.sh` scripts with contents:
     of python for Databricks. On Databricks, the python runtime requires different parameters than the
     Spark one, so a dedicated python demon module `rapids.daemon_databricks` is created and should
     be specified here. Set the config
-    [`spark.rapids.sql.python.gpu.enabled`](https://nvidia.github.io/spark-rapids/docs/configs.html#sql.python.gpu.enabled) to `true` to
+    [`spark.rapids.sql.python.gpu.enabled`](https://nvidia.github.io/cudf-spark/docs/configs.html#sql.python.gpu.enabled) to `true` to
     enable GPU support for python. Add the path of the plugin jar (supposing it is placed under
     `/databricks/jars/`) to the `spark.executorEnv.PYTHONPATH` option. For more details please go to
-    [GPU Scheduling For Pandas UDF](https://nvidia.github.io/spark-rapids/docs/additional-functionality/rapids-udfs.html#gpu-support-for-pandas-udf)
+    [GPU Scheduling For Pandas UDF](https://nvidia.github.io/cudf-spark/docs/additional-functionality/rapids-udfs.html#gpu-support-for-pandas-udf)
 
     ```bash
     spark.rapids.sql.python.gpu.enabled true
     spark.python.daemon.module rapids.daemon_databricks
-    spark.executorEnv.PYTHONPATH /databricks/jars/rapids-4-spark_2.12-26.06.0.jar:/databricks/spark/python
+    spark.executorEnv.PYTHONPATH /databricks/jars/rapids-4-spark_2.12-26.08.0.jar:/databricks/spark/python
     ```
    Note that since python memory pool require installing the cudf library, so you need to install cudf library in 
    each worker nodes `pip install cudf-cu11 --extra-index-url=https://pypi.nvidia.com` or disable python memory pool
@@ -166,6 +165,6 @@ Limitations
 4. Databricks makes changes to the runtime without notification.
 
     Databricks makes changes to existing runtimes, applying patches, without notification.
-    [Issue-3098](https://github.com/NVIDIA/spark-rapids/issues/3098) is one example of this.  We run
+    [Issue-3098](https://github.com/NVIDIA/cudf-spark/issues/3098) is one example of this.  We run
     regular integration tests on the Databricks environment to catch these issues and fix them once
     detected.

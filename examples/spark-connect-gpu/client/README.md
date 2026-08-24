@@ -1,7 +1,7 @@
 # GPU-Accelerated Spark Connect for ETL and ML (Spark 4.0)
 
 This project demonstrates some python/scala batch jobs and a complete GPU-accelerated ETL and
-Machine Learning pipeline using Apache Spark 4.0 with Spark Connect, featuring the RAPIDS Accelerator.
+Machine Learning pipeline using Apache Spark 4.0 with Spark Connect, featuring the NVIDIA cuDF plugin for Apache Spark.
 
 ## 🏗️ Architecture
 
@@ -71,7 +71,7 @@ found [here](../server/README.md).
 
 Most users won't need to adjust the GPU configurations. However, if you'd like
 to tune your GPU for better performance, refer to the
-[advanced GPU configurations documentation](https://nvidia.github.io/spark-rapids/docs/additional-functionality/advanced_configs.html).
+[advanced GPU configurations documentation](https://nvidia.github.io/cudf-spark/docs/additional-functionality/advanced_configs.html).
 
 **Note**: Configurations prefixed with spark.rapids.sql are session-specific
 and can be set safely. However, those marked as **startup** will not take
@@ -107,5 +107,5 @@ docker logs spark-connect-client
 
 - [Apache Spark 4.0 Documentation](https://spark.apache.org/docs/latest/)
 - [Spark Connect Guide](https://spark.apache.org/docs/latest/spark-connect-overview.html)
-- [NVIDIA RAPIDS Accelerator](https://nvidia.github.io/spark-rapids/)
+- [NVIDIA cuDF plugin for Apache Spark](https://nvidia.github.io/cudf-spark/)
 - [Data and AI Summit Session](https://www.databricks.com/dataaisummit/session/gpu-accelerated-spark-connect)

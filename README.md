@@ -1,15 +1,15 @@
 # spark-rapids-examples
 
-This is the [RAPIDS Accelerator for Apache Spark](https://nvidia.github.io/spark-rapids/) examples repo.
-RAPIDS Accelerator for Apache Spark accelerates Spark applications with no code changes.
-You can download the latest version of RAPIDS Accelerator [here](https://nvidia.github.io/spark-rapids/docs/download.html).
+This is the [NVIDIA cuDF plugin for Apache Spark](https://nvidia.github.io/cudf-spark/) examples repo.
+The cuDF plugin accelerates Spark applications with no code changes.
+You can download the latest version of the cuDF plugin [here](https://nvidia.github.io/cudf-spark/docs/download.html).
 This repo contains examples and applications that showcases the performance and benefits of using 
-RAPIDS Accelerator in data processing and machine learning pipelines. 
+the cuDF plugin in data processing and machine learning pipelines.
 There are broadly five categories of examples in this repo: 
 1. [SQL/Dataframe](./examples/SQL+DF-Examples) 
 2. [Spark XGBoost](./examples/XGBoost-Examples) 
 3. [Machine Learning/Deep Learning](./examples/ML+DL-Examples) 
-4. [RAPIDS UDF](./examples/UDF-Examples)
+4. [cuDF plugin UDF](./examples/UDF-Examples)
 5. [Databricks Tools demo notebooks](./tools/databricks)
 
 For more information on each of the examples please look into respective categories.
@@ -29,7 +29,7 @@ Here is the list of notebooks in this repo:
 | 9 | SQL/DF | [TPC-DS](https://www.tpc.org/tpcds/) Scale Factor 10 | Comparison of Spark SQL CPU vs GPU. Easy to run locally and on Google Colab
 
 Here is the list of Apache Spark applications (Scala and PySpark) that 
-can be built for running on GPU with RAPIDS Accelerator in this repo:
+can be built for running on GPU with the cuDF plugin in this repo:
 
 |   | Category  | Notebook Name | Description
 | ------------- | ------------- | ------------- | -------------

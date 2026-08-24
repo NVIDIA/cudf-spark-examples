@@ -1,6 +1,6 @@
 # Databricks Qualification/Profiling Quick Start Notebooks
 
-The RAPIDS Accelerator for Apache Spark includes two key tools for understanding the benefits of
+The NVIDIA cuDF plugin for Apache Spark provides two key tools for understanding the benefits of
 GPU acceleration as well as analyzing GPU Spark jobs.  For customers on Databricks, the quick start notebooks offer a simple interface for running the tools given a set of Spark event logs from
 CPU (qualification) or GPU (profiling) application runs.
 
@@ -19,4 +19,4 @@ top of the notebook.  After that, select *Run all* to execute the tools for the 
 1. Multiple event logs must be comma-separated. 
    - For example: `/dbfs/path/to/eventlog1,/dbfs/path/to/eventlog2`
 
-**Latest Tools Version Supported** 26.06.0
+**Latest Tools Version Supported** 26.08.0

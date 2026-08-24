@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022, NVIDIA CORPORATION.
+ * Copyright (c) 2021-2026, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ import java.net.URLDecoder;
  * A Java user-defined function (UDF) that decodes URL-encoded strings.
  * This class demonstrates how to implement a Java UDF that also
  * provides a RAPIDS implementation that can run on the GPU when the query
- * is executed with the RAPIDS Accelerator for Apache Spark.
+ * is executed with the NVIDIA cuDF plugin for Apache Spark.
  */
 public class URLDecode implements UDF1<String, String>, RapidsUDF {
   /** Row-by-row implementation that executes on the CPU */
