@@ -402,7 +402,7 @@
 
                                             <echo message="✓ libcudf.so extracted to: ${project.build.directory}/native-deps"/>
 
-                                            <!-- Resolve matching cuDF/RMM/CCCL pins from the spark-rapids-jni
+                                            <!-- Resolve matching cuDF/RMM/CCCL pins from the cudf-spark-jni
                                                  revision embedded in the rapids-4-spark jar. -->
                                             <chmod file="${basedir}/resolve-jni-cudf-pins.sh" perm="755"/>
                                             <exec executable="${basedir}/resolve-jni-cudf-pins.sh" failonerror="true">

@@ -147,8 +147,9 @@ mvn clean package -Pudf-native-examples
 The build will automatically:
 - Extract `libcudf.so` from older rapids-4-spark jars or reconstruct it from
   the chunk-manifest representation used by newer jars
-- Read the embedded `spark-rapids-jni` and `cudf-java` version metadata from the jar
-- Download the matching `spark-rapids-jni` `cudf-pins` files
+- Read the embedded `cudf-spark-jni` and `cudf-java` version metadata from
+  the jar
+- Download the matching `cudf-spark-jni` `cudf-pins` files
 - Clone the cuDF repository at the revision recorded in the jar
 - Configure rapids-cmake with the matching `rapids-cmake` sha and package override file
 - Build only your UDF native code against the prebuilt library
@@ -165,7 +166,7 @@ library.
 
 When changing the rapids-4-spark jar version, rebuild the native UDFs with
 matching cuDF/RMM/CCCL headers and libraries. In prebuilt mode, the Maven build
-derives those native dependency pins from the `spark-rapids-jni` revision
+derives those native dependency pins from the `cudf-spark-jni` revision
 recorded in the jar. After changing jar versions, remove `target/native-deps`,
 `target/cudf-repo`, `target/cudf-pins`, and `target/cpp-build` before
 rebuilding so stale headers, pins, or libraries are not reused.
