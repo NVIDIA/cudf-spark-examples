@@ -87,7 +87,7 @@ download_file() {
     fi
 }
 
-JNI_INFO="spark-rapids-jni-version-info.properties"
+JNI_INFO="cudf-spark-jni-version-info.properties"
 CUDF_INFO="cudf-java-version-info.properties"
 
 JNI_REVISION="$(read_property_from_jar "$JNI_INFO" revision || true)"
@@ -95,7 +95,7 @@ JNI_URL="$(read_property_from_jar "$JNI_INFO" url || true)"
 CUDF_REVISION="$(read_property_from_jar "$CUDF_INFO" revision || true)"
 
 if [ -z "$JNI_REVISION" ] || [ -z "$JNI_URL" ]; then
-    echo "ERROR: Failed to read spark-rapids-jni revision/url from $JAR_PATH" >&2
+    echo "ERROR: Failed to read cudf-spark-jni revision/url from $JAR_PATH" >&2
     echo "Expected $JNI_INFO in the jar." >&2
     exit 1
 fi
@@ -108,7 +108,7 @@ fi
 
 RAW_BASE="$(normalize_github_raw_base "$JNI_URL")"
 if [ -z "$RAW_BASE" ]; then
-    echo "ERROR: Unsupported spark-rapids-jni URL for automatic pin lookup: $JNI_URL" >&2
+    echo "ERROR: Unsupported cudf-spark-jni URL for automatic pin lookup: $JNI_URL" >&2
     echo "Only github.com URLs can be resolved automatically." >&2
     exit 1
 fi
@@ -161,14 +161,14 @@ download_file "https://raw.githubusercontent.com/rapidsai/rapids-cmake/$RAPIDS_C
 
 cat > "$PROPERTIES_FILE" <<EOF
 jar.cudf.revision=$CUDF_REVISION
-jar.spark.rapids.jni.revision=$JNI_REVISION
+jar.cudf.spark.jni.revision=$JNI_REVISION
 jar.rapids.cmake.sha=$RAPIDS_CMAKE_SHA
 jar.rapids.cmake.file=$RAPIDS_CMAKE_FILE
 jar.cudf.pins.file=$VERSIONS_FILE
 EOF
 
 echo "Resolved native dependency pins from rapids-4-spark jar:"
-echo "  spark-rapids-jni revision: $JNI_REVISION"
+echo "  cudf-spark-jni revision: $JNI_REVISION"
 echo "  cuDF revision: $CUDF_REVISION"
 echo "  rapids-cmake sha: $RAPIDS_CMAKE_SHA"
 echo "  rapids-cmake entrypoint: $RAPIDS_CMAKE_FILE"
