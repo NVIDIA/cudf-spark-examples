@@ -410,6 +410,9 @@ link_directories("${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES}"
 # - library targets -------------------------------------------------------------------------------
 
 set(SOURCE_FILES
+    "src/integer_average.cu"
+    "src/integer_average_host_udf.cpp"
+    "src/IntegerAverageJni.cpp"
     "src/CosineSimilarityJni.cpp"
     "src/StringWordCountJni.cpp"
     "src/cosine_similarity.cu"
