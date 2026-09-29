@@ -29,13 +29,13 @@
 #
 # Environment Variables (optional, will use pom.xml values if not set):
 #   RAPIDS_JAR_PATH      - explicit rapids-4-spark jar path
-#   RAPIDS4SPARK_VERSION - rapids-4-spark version (e.g., 26.10.0 or 26.10.0-SNAPSHOT)
+#   RAPIDS4SPARK_VERSION - rapids-4-spark version (e.g., 26.12.0 or 26.12.0-SNAPSHOT)
 #   SCALA_VERSION        - Scala binary version (e.g., 2.12, 2.13)
 #   CUDA_VERSION         - CUDA version (e.g., cuda11, cuda12)
 #   CUDF_BRANCH          - cuDF git branch for headers (e.g., main, branch-26.08)
 #
 # Example with overrides:
-#   RAPIDS4SPARK_VERSION=26.10.0 CUDA_VERSION=cuda12 ./extract-cudf-libs.sh
+#   RAPIDS4SPARK_VERSION=26.12.0 CUDA_VERSION=cuda12 ./extract-cudf-libs.sh
 ###############################################################################
 
 set -e
