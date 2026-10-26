@@ -71,4 +71,4 @@ By making a contribution to this project, I certify that:
     this project or the open source license(s) involved.
 ```
 
-Note: This section `Sign your work` is derived from [https://github.com/NVIDIA/spark-rapids](https://github.com/NVIDIA/spark-rapids)
+Note: This section `Sign your work` is derived from [https://github.com/NVIDIA/cudf-spark](https://github.com/NVIDIA/cudf-spark)

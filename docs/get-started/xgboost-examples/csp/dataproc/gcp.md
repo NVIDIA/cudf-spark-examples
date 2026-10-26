@@ -1,4 +1,4 @@
-# Getting started pyspark+xgboost with RAPIDS Accelerator on GCP Dataproc
+# Getting started with PySpark, XGBoost, and the NVIDIA cuDF plugin for Apache Spark on GCP Dataproc
  [Google Cloud Dataproc](https://cloud.google.com/dataproc) is Google Cloud's fully managed Apache
  Spark and Hadoop service. Please make sure to install gcloud CLI by following 
  this [guide](https://cloud.google.com/sdk/docs/install) before getting started.

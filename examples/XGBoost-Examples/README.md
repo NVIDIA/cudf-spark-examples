@@ -5,8 +5,8 @@ The Scala based XGBoost examples here use [DMLC’s version](https://repo1.maven
 The pyspark based XGBoost examples requires [installing RAPIDS via pip](https://rapids.ai/pip.html#install).
 Most data scientists spend a lot of time not only on
 Training models but also processing the large amounts of data needed to train these models.
-As you can see below, Pyspark+XGBoost training on GPUs can be up to 13X and data processing using
-RAPIDS Accelerator can also be accelerated with an end-to-end speed-up of 11X on GPU compared to CPU.
+As shown below, PySpark and XGBoost training on GPUs can be up to 13X faster, while data processing with
+the NVIDIA cuDF plugin for Apache Spark can deliver an end-to-end speedup of 11X over CPU execution.
 In the public cloud, better performance can lead to significantly lower costs as demonstrated in this [blog](https://developer.nvidia.com/blog/gpu-accelerated-spark-xgboost/).
 
 ![mortgage-speedup](/docs/img/guides/mortgage-perf.png)
@@ -16,7 +16,7 @@ with a 8 A100 GPU and 1024 CPU vcores cluster, the performance is affected by ma
 including data size and type of GPU. 
 
 In this folder, there are three blue prints for users to learn about using 
-Spark XGBoost and RAPIDS Accelerator on GPUs :
+Spark XGBoost and the cuDF plugin on GPUs:
 
 1. Mortgage Prediction
 2. Agaricus Classification

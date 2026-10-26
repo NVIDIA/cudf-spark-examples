@@ -103,5 +103,5 @@ Note the getMIGGpus discovery script would is in the `scripts` directory in this
 `nvidia/miggpu`.
 
 ## Testing
-Run a Spark application using the [Rapids Accelerator for Apache Spark](https://nvidia.github.io/spark-rapids/) and request GPUs
+Run a Spark application using the [NVIDIA cuDF plugin for Apache Spark](https://nvidia.github.io/cudf-spark/) and request GPUs
 from YARN and verify they use the MIG enabled GPUs.

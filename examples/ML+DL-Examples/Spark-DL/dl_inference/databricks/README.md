@@ -48,4 +48,4 @@ Make sure you are in [this](./) directory.
 
 7. Navigate to the notebook in your workspace and attach it to the cluster. The default cluster name is `spark-dl-inference-$FRAMEWORK`.  
 
-*Note that the RAPIDS Accelerator for Apache Spark is not compatible with this case, since [multiple GPUs per executor are not yet supported](https://docs.nvidia.com/spark-rapids/user-guide/latest/faq.html#why-are-multiple-gpus-per-executor-not-supported).
+*Note that the NVIDIA cuDF plugin for Apache Spark is not compatible with this case, since [multiple GPUs per executor are not yet supported](https://docs.nvidia.com/spark-rapids/user-guide/latest/faq.html#why-are-multiple-gpus-per-executor-not-supported).

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2022, NVIDIA CORPORATION.
+ * Copyright (c) 2020-2026, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ import java.net.URLEncoder;
  * A Hive user-defined function (UDF) that URL-encodes strings.
  * This class demonstrates how to implement a Hive GenericUDF that also
  * provides a RAPIDS implementation that can run on the GPU when the query
- * is executed with the RAPIDS Accelerator for Apache Spark.
+ * is executed with the NVIDIA cuDF plugin for Apache Spark.
  */
 public class URLEncode extends GenericUDF implements RapidsUDF {
   private transient PrimitiveObjectInspectorConverter.TextConverter converter;
