@@ -37,13 +37,13 @@ jobs:
   build:
     name: Build GPU test artifacts
     if: github.repository == 'NVIDIA/cudf-spark-examples'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
       artifact-id: ${{ steps.artifacts.outputs.artifact-id }}
     steps:
       - name: Checkout approved source
-        uses: NVIDIA/spark-rapids-common/checkout@759281cb85cc8a4abf67fc724e26752610c8bafc
+        uses: NVIDIA/spark-rapids-common/checkout@main
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
@@ -74,7 +74,7 @@ jobs:
   gpu:
     name: GPU sanity
     needs: build
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     timeout-minutes: 70
     permissions:
       contents: read
@@ -82,7 +82,7 @@ jobs:
     steps:
       # Only the shared action receives write access; this job never executes PR code.
       - name: Run GPU tests with queue fallback
-        uses: NVIDIA/spark-rapids-common/runner-queue-fallback@759281cb85cc8a4abf67fc724e26752610c8bafc
+        uses: NVIDIA/spark-rapids-common/runner-queue-fallback@main
         with:
           workflow: gpu-ci-worker.yml
           # Full-SHA approval covers this copied branch's worker definition as well as its tests.

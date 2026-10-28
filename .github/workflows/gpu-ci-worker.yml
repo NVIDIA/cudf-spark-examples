@@ -60,7 +60,7 @@ jobs:
       PYTHONHASHSEED: '0'
     steps:
       - name: Check coordinator and approved source
-        uses: NVIDIA/spark-rapids-common/runner-queue-fallback/guard@759281cb85cc8a4abf67fc724e26752610c8bafc
+        uses: NVIDIA/spark-rapids-common/runner-queue-fallback/guard@main
         with:
           request-id: ${{ inputs.request-id }}
           parent-run-id: ${{ inputs.parent-run-id }}
@@ -78,7 +78,7 @@ jobs:
           [[ "$GITHUB_REF" == "$SOURCE_REF" && "$GITHUB_SHA" == "$SOURCE_SHA" ]]
           [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
       - name: Checkout approved source
-        uses: NVIDIA/spark-rapids-common/checkout@759281cb85cc8a4abf67fc724e26752610c8bafc
+        uses: NVIDIA/spark-rapids-common/checkout@main
         with:
           ref: ${{ inputs.source-sha }}
           persist-credentials: false
