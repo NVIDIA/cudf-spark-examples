@@ -72,16 +72,38 @@ jobs:
           retention-days: 2
 
   gpu:
-    name: GPU sanity
+    name: GPU sanity (${{ matrix.gpu }})
     needs: build
+    # Temporary validation: exercise every pool independently, using the same CPU build.
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include:
+          - gpu: RTX PRO 6000
+            runner:
+              group: nv-gpu-amd64-rtxpro6000-1gpu
+              labels: linux-amd64-gpu-rtxpro6000-latest-1
+          - gpu: H100
+            runner:
+              group: nv-gpu-amd64-h100-1gpu
+              labels: linux-amd64-gpu-h100-latest-1
+          - gpu: A100
+            runner:
+              group: nv-gpu-amd64-a100-1gpu
+              labels: linux-amd64-gpu-a100-latest-1
+          - gpu: L4
+            runner:
+              group: nv-gpu-general
+              labels: linux-amd64-gpu-l4-latest-1
     runs-on: ubuntu-latest
-    timeout-minutes: 70
+    timeout-minutes: 40
     permissions:
       contents: read
       actions: write
     steps:
       # Only the shared action receives write access; this job never executes PR code.
-      - name: Run GPU tests with queue fallback
+      - name: Validate GPU pool
         uses: NVIDIA/spark-rapids-common/runner-queue-fallback@main
         with:
           workflow: gpu-ci-worker.yml
@@ -92,11 +114,5 @@ jobs:
           workload: ${{ toJSON(needs.build.outputs) }}
           queue-timeout-minutes: '10'
           execution-timeout-minutes: '15'
-          # Latest-driver pools, ordered by the observed average scheduling wait.
-          runners: >-
-            [
-              {"group":"nv-gpu-amd64-rtxpro6000-1gpu","labels":"linux-amd64-gpu-rtxpro6000-latest-1"},
-              {"group":"nv-gpu-amd64-h100-1gpu","labels":"linux-amd64-gpu-h100-latest-1"},
-              {"group":"nv-gpu-amd64-a100-1gpu","labels":"linux-amd64-gpu-a100-latest-1"},
-              {"group":"nv-gpu-general","labels":"linux-amd64-gpu-l4-latest-1"}
-            ]
+          # Do not fall back to another pool: each result must describe the requested GPU type.
+          runners: '[${{ toJSON(matrix.runner) }}]'
