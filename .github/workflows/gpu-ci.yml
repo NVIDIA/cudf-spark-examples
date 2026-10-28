@@ -20,7 +20,7 @@ on:
     branches:
       - 'pull-request/[0-9]+'
     paths:
-      - .github/workflows/gpu-ci.yml
+      - .github/workflows/gpu-ci*.yml
       - examples/UDF-Examples/RAPIDS-accelerated-UDFs/**
 
 permissions:
@@ -54,7 +54,10 @@ jobs:
           java-version: '8'
       - name: Build non-native UDF examples
         working-directory: examples/UDF-Examples/RAPIDS-accelerated-UDFs
-        run: mvn -B -ntp clean package
+        run: |
+          set -euo pipefail
+          mvn -B -ntp clean package
+          printf '%s\n' "$GITHUB_SHA" > target/gpu-ci-source-sha.txt
       - name: Upload test artifacts
         id: artifacts
         uses: actions/upload-artifact@v7.0.2
@@ -63,6 +66,7 @@ jobs:
           path: |
             examples/UDF-Examples/RAPIDS-accelerated-UDFs/target/rapids-4-spark-udf-examples*.jar
             examples/UDF-Examples/RAPIDS-accelerated-UDFs/target/dependency/rapids-4-spark*.jar
+            examples/UDF-Examples/RAPIDS-accelerated-UDFs/target/gpu-ci-source-sha.txt
           if-no-files-found: error
           compression-level: 0
           retention-days: 2
@@ -70,66 +74,29 @@ jobs:
   gpu:
     name: GPU sanity
     needs: build
-    runs-on:
-      group: nv-gpu-amd64-rtxpro6000-1gpu
-      labels: linux-amd64-gpu-rtxpro6000-latest-1
-    timeout-minutes: 15
-    env:
-      SPARK_LOCAL_IP: 127.0.0.1
-      PYTHONHASHSEED: '0'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 70
+    permissions:
+      contents: read
+      actions: write
     steps:
-      - name: Checkout approved source
-        uses: NVIDIA/spark-rapids-common/checkout@759281cb85cc8a4abf67fc724e26752610c8bafc
+      # Only the shared action receives write access; this job never executes PR code.
+      - name: Run GPU tests with queue fallback
+        uses: NVIDIA/spark-rapids-common/runner-queue-fallback@759281cb85cc8a4abf67fc724e26752610c8bafc
         with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-      # Use the producer's artifact ID so rerunning only a failed GPU job still works.
-      - name: Download CPU build artifacts
-        uses: actions/download-artifact@v8.0.2
-        with:
-          artifact-ids: ${{ needs.build.outputs.artifact-id }}
-          merge-multiple: true
-          path: examples/UDF-Examples/RAPIDS-accelerated-UDFs/target
-      - name: Set up Java
-        uses: actions/setup-java@v6.1.0
-        with:
-          distribution: temurin
-          java-version: '8'
-      - name: Set up Python
-        uses: actions/setup-python@v7.1.0
-        with:
-          python-version: '3.10'
-      - name: Install test dependencies
-        run: |
-          set -euo pipefail
-          python -m pip install --disable-pip-version-check \
-            'pyspark==3.3.0' 'pytest==8.4.2' 'sre_yield==1.2'
-          python -c 'import os, pyspark; print("SPARK_HOME=" + os.path.dirname(pyspark.__file__))' >> "$GITHUB_ENV"
-      - name: Run GPU sanity tests
-        working-directory: examples/UDF-Examples/RAPIDS-accelerated-UDFs
-        run: |
-          set -euo pipefail
-          nvidia-smi 2>&1 | tee "$RUNNER_TEMP/gpu-ci.log"
-          bash run_pyspark_from_build.sh -m 'not rapids_udf_example_native' \
-            --junitxml="$RUNNER_TEMP/gpu-ci.xml" 2>&1 | tee -a "$RUNNER_TEMP/gpu-ci.log"
-          python - <<'PY'
-          import os
-          import xml.etree.ElementTree as ET
-
-          report = ET.parse(os.path.join(os.environ["RUNNER_TEMP"], "gpu-ci.xml"))
-          if not report.findall(".//testcase") or any(
-              report.findall(f".//{result}") for result in ("skipped", "failure", "error")
-          ):
-              raise SystemExit("GPU sanity requires executed, passing tests without skips")
-          PY
-      - name: Upload GPU evidence
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v7.0.2
-        with:
-          name: gpu-ci-results-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            ${{ runner.temp }}/gpu-ci.log
-            ${{ runner.temp }}/gpu-ci.xml
-            examples/UDF-Examples/RAPIDS-accelerated-UDFs/eventlog_*/
-          if-no-files-found: warn
-          retention-days: 7
+          workflow: gpu-ci-worker.yml
+          # Full-SHA approval covers this copied branch's worker definition as well as its tests.
+          workflow-ref: ${{ github.ref_name }}
+          source-ref: ${{ github.ref }}
+          source-sha: ${{ github.sha }}
+          workload: ${{ toJSON(needs.build.outputs) }}
+          queue-timeout-minutes: '10'
+          execution-timeout-minutes: '15'
+          # Latest-driver pools, ordered by the observed average scheduling wait.
+          runners: >-
+            [
+              {"group":"nv-gpu-amd64-rtxpro6000-1gpu","labels":"linux-amd64-gpu-rtxpro6000-latest-1"},
+              {"group":"nv-gpu-amd64-h100-1gpu","labels":"linux-amd64-gpu-h100-latest-1"},
+              {"group":"nv-gpu-amd64-a100-1gpu","labels":"linux-amd64-gpu-a100-latest-1"},
+              {"group":"nv-gpu-general","labels":"linux-amd64-gpu-l4-latest-1"}
+            ]

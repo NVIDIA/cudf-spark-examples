@@ -1,0 +1,144 @@
+# Copyright (c) 2026, NVIDIA CORPORATION.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: GPU CI worker
+run-name: ${{ inputs.request-id || 'Register GPU worker for PR validation' }}
+
+on:
+  # Register the workflow before merge. This event skips the worker and allocates no GPU.
+  pull_request:
+    paths:
+      - .github/workflows/gpu-ci*.yml
+  workflow_dispatch:
+    inputs:
+      request-id:
+        required: true
+        type: string
+      parent-run-id:
+        required: true
+        type: string
+      parent-run-attempt:
+        required: true
+        type: string
+      source-ref:
+        required: true
+        type: string
+      source-sha:
+        required: true
+        type: string
+      runner:
+        required: true
+        type: string
+      workload:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  worker:
+    name: worker
+    if: github.event_name == 'workflow_dispatch' && github.repository == 'NVIDIA/cudf-spark-examples'
+    runs-on: ${{ fromJSON(inputs.runner) }}
+    timeout-minutes: 15
+    env:
+      TZ: UTC
+      SPARK_LOCAL_IP: 127.0.0.1
+      PYTHONHASHSEED: '0'
+    steps:
+      - name: Check coordinator and approved source
+        uses: NVIDIA/spark-rapids-common/runner-queue-fallback/guard@759281cb85cc8a4abf67fc724e26752610c8bafc
+        with:
+          request-id: ${{ inputs.request-id }}
+          parent-run-id: ${{ inputs.parent-run-id }}
+          parent-run-attempt: ${{ inputs.parent-run-attempt }}
+          source-ref: ${{ inputs.source-ref }}
+          source-sha: ${{ inputs.source-sha }}
+      - name: Check approved worker definition
+        env:
+          SOURCE_REF: ${{ inputs.source-ref }}
+          SOURCE_SHA: ${{ inputs.source-sha }}
+          ARTIFACT_ID: ${{ fromJSON(inputs.workload).artifact-id }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_REF" =~ ^refs/heads/pull-request/[0-9]+$ ]]
+          [[ "$GITHUB_REF" == "$SOURCE_REF" && "$GITHUB_SHA" == "$SOURCE_SHA" ]]
+          [[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]
+      - name: Checkout approved source
+        uses: NVIDIA/spark-rapids-common/checkout@759281cb85cc8a4abf67fc724e26752610c8bafc
+        with:
+          ref: ${{ inputs.source-sha }}
+          persist-credentials: false
+      # Keep the successful producer's artifact ID when rerunning only the coordinator.
+      - name: Download CPU build artifacts
+        uses: actions/download-artifact@v8.0.2
+        with:
+          artifact-ids: ${{ fromJSON(inputs.workload).artifact-id }}
+          run-id: ${{ inputs.parent-run-id }}
+          github-token: ${{ github.token }}
+          merge-multiple: true
+          path: examples/UDF-Examples/RAPIDS-accelerated-UDFs/target
+      - name: Check build source
+        working-directory: examples/UDF-Examples/RAPIDS-accelerated-UDFs
+        env:
+          SOURCE_SHA: ${{ inputs.source-sha }}
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]]
+          [[ "$(cat target/gpu-ci-source-sha.txt)" == "$SOURCE_SHA" ]]
+      - name: Set up Java
+        uses: actions/setup-java@v6.1.0
+        with:
+          distribution: temurin
+          java-version: '8'
+      - name: Set up Python
+        uses: actions/setup-python@v7.1.0
+        with:
+          python-version: '3.10'
+      - name: Install test dependencies
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check \
+            'pyspark==3.3.0' 'pytest==8.4.2' 'sre_yield==1.2'
+          python -c 'import os, pyspark; print("SPARK_HOME=" + os.path.dirname(pyspark.__file__))' >> "$GITHUB_ENV"
+      - name: Run GPU sanity tests
+        working-directory: examples/UDF-Examples/RAPIDS-accelerated-UDFs
+        run: |
+          set -euo pipefail
+          nvidia-smi 2>&1 | tee "$RUNNER_TEMP/gpu-ci.log"
+          bash run_pyspark_from_build.sh -m 'not rapids_udf_example_native' \
+            --junitxml="$RUNNER_TEMP/gpu-ci.xml" 2>&1 | tee -a "$RUNNER_TEMP/gpu-ci.log"
+          python - <<'PY'
+          import os
+          import xml.etree.ElementTree as ET
+
+          report = ET.parse(os.path.join(os.environ["RUNNER_TEMP"], "gpu-ci.xml"))
+          if not report.findall(".//testcase") or any(
+              report.findall(f".//{result}") for result in ("skipped", "failure", "error")
+          ):
+              raise SystemExit("GPU sanity requires executed, passing tests without skips")
+          PY
+      - name: Upload GPU evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: gpu-ci-results-${{ inputs.parent-run-id }}-${{ inputs.parent-run-attempt }}-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/gpu-ci.log
+            ${{ runner.temp }}/gpu-ci.xml
+            examples/UDF-Examples/RAPIDS-accelerated-UDFs/eventlog_*/
+          if-no-files-found: warn
+          retention-days: 7
