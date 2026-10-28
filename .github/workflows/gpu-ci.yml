@@ -95,7 +95,8 @@ jobs:
           workflow-ref: ${{ github.ref_name }}
           source-ref: ${{ github.ref }}
           source-sha: ${{ github.sha }}
-          workload: ${{ toJSON(needs.build.outputs) }}
+          workload: >-
+            {"artifact-id":"${{ needs.build.outputs.artifact-id }}","fail-worker":${{ matrix.run == 1 }}}
           queue-timeout-minutes: '10'
           execution-timeout-minutes: '15'
           # Latest-driver pools, ordered by the observed average scheduling wait.

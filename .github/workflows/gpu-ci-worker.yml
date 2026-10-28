@@ -99,6 +99,12 @@ jobs:
           set -euo pipefail
           [[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]]
           [[ "$(cat target/gpu-ci-source-sha.txt)" == "$SOURCE_SHA" ]]
+      - name: Simulate worker failure (validation only)
+        if: ${{ fromJSON(inputs.workload).fail-worker == true }}
+        run: |
+          printf '%s\n' 'Intentional worker failure for parallel run 1 (exit 42); no workload retry expected.' \
+            | tee "$RUNNER_TEMP/gpu-ci.log"
+          exit 42
       - name: Set up Java
         uses: actions/setup-java@v6.1.0
         with:
