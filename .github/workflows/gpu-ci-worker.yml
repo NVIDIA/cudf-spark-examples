@@ -147,4 +147,4 @@ jobs:
             ${{ runner.temp }}/gpu-ci.xml
             examples/UDF-Examples/RAPIDS-accelerated-UDFs/eventlog_*/
           if-no-files-found: warn
-          retention-days: 7
+          retention-days: 2
