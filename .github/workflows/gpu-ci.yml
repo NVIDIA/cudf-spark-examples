@@ -130,6 +130,12 @@ jobs:
               udf_jars=(target/rapids-4-spark-udf-examples*.jar)
               [[ ${#udf_jars[@]} -eq 1 ]]
               jar tf "${udf_jars[0]}" | grep -Fx "amd64/Linux/libudfexamplesjni.so"
+
+              # The UDF jar does not bundle these shared libraries; the GPU worker needs both.
+              mkdir -p target/native-runtime
+              cp -L target/cpp-build/_deps/rmm-build/librmm.so \
+                target/cpp-build/_deps/rapids_logger-build/librapids_logger.so \
+                target/native-runtime/
             '
           printf '%s\n' "$GITHUB_SHA" > target/gpu-ci-source-sha.txt
       - name: Upload test artifacts
@@ -140,6 +146,7 @@ jobs:
           path: |
             examples/UDF-Examples/RAPIDS-accelerated-UDFs/target/rapids-4-spark-udf-examples*.jar
             examples/UDF-Examples/RAPIDS-accelerated-UDFs/target/dependency/rapids-4-spark*.jar
+            examples/UDF-Examples/RAPIDS-accelerated-UDFs/target/native-runtime/*.so
             examples/UDF-Examples/RAPIDS-accelerated-UDFs/target/gpu-ci-source-sha.txt
           if-no-files-found: error
           compression-level: 0

@@ -121,6 +121,9 @@ jobs:
         run: |
           set -euo pipefail
           nvidia-smi 2>&1 | tee "$RUNNER_TEMP/gpu-ci.log"
+          test -s target/native-runtime/librmm.so
+          test -s target/native-runtime/librapids_logger.so
+          export LD_LIBRARY_PATH="$PWD/target/native-runtime${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
           bash run_pyspark_from_build.sh --rapids_udf_example_native \
             --junitxml="$RUNNER_TEMP/gpu-ci.xml" 2>&1 | tee -a "$RUNNER_TEMP/gpu-ci.log"
           python - <<'PY'
