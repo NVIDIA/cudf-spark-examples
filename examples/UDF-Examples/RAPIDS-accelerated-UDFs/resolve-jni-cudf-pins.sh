@@ -92,6 +92,12 @@ CUDF_INFO="cudf-java-version-info.properties"
 
 JNI_REVISION="$(read_property_from_jar "$JNI_INFO" revision || true)"
 JNI_URL="$(read_property_from_jar "$JNI_INFO" url || true)"
+# Released jars from before the JNI rename use the original metadata filename.
+if [ -z "$JNI_REVISION" ] && [ -z "$JNI_URL" ]; then
+    JNI_INFO="spark-rapids-jni-version-info.properties"
+    JNI_REVISION="$(read_property_from_jar "$JNI_INFO" revision || true)"
+    JNI_URL="$(read_property_from_jar "$JNI_INFO" url || true)"
+fi
 CUDF_REVISION="$(read_property_from_jar "$CUDF_INFO" revision || true)"
 
 if [ -z "$JNI_REVISION" ] || [ -z "$JNI_URL" ]; then

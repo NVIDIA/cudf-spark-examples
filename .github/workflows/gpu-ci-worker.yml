@@ -108,6 +108,8 @@ jobs:
         uses: actions/setup-python@v7.1.0
         with:
           python-version: '3.10'
+          cache: pip
+          cache-dependency-path: .github/workflows/gpu-ci-worker.yml
       - name: Install test dependencies
         run: |
           set -euo pipefail
@@ -119,7 +121,7 @@ jobs:
         run: |
           set -euo pipefail
           nvidia-smi 2>&1 | tee "$RUNNER_TEMP/gpu-ci.log"
-          bash run_pyspark_from_build.sh -m 'not rapids_udf_example_native' \
+          bash run_pyspark_from_build.sh --rapids_udf_example_native \
             --junitxml="$RUNNER_TEMP/gpu-ci.xml" 2>&1 | tee -a "$RUNNER_TEMP/gpu-ci.log"
           python - <<'PY'
           import os

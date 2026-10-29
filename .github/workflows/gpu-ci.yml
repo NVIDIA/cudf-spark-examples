@@ -38,7 +38,7 @@ jobs:
     name: Build GPU test artifacts
     if: github.repository == 'NVIDIA/cudf-spark-examples'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     outputs:
       artifact-id: ${{ steps.artifacts.outputs.artifact-id }}
     steps:
@@ -47,16 +47,70 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - name: Set up Java
-        uses: actions/setup-java@v6.1.0
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4.4.1
+      - name: Build cached native toolchain
+        uses: docker/build-push-action@v7.4.0
         with:
-          distribution: temurin
-          java-version: '8'
-      - name: Build non-native UDF examples
+          context: examples/UDF-Examples/RAPIDS-accelerated-UDFs
+          platforms: linux/amd64
+          load: true
+          tags: udf-ci:local
+          cache-from: type=gha,scope=udf-native-toolchain
+          cache-to: type=gha,scope=udf-native-toolchain,mode=max,ignore-error=true
+        env:
+          DOCKER_BUILD_RECORD_RETENTION_DAYS: '2'
+      - name: Cache Maven dependencies
+        uses: actions/cache@v6.1.0
+        with:
+          path: ~/.m2/repository
+          key: udf-maven-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('examples/UDF-Examples/RAPIDS-accelerated-UDFs/pom.xml') }}
+          restore-keys: |
+            udf-maven-${{ runner.os }}-${{ runner.arch }}-
+      - name: Cache native compilation and dependency sources
+        uses: actions/cache@v6.1.0
+        with:
+          path: |
+            ~/.cache/udf-native/ccache
+            ~/.cache/udf-native/cpm
+          key: udf-native-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('examples/UDF-Examples/RAPIDS-accelerated-UDFs/Dockerfile', 'examples/UDF-Examples/RAPIDS-accelerated-UDFs/pom.xml') }}-${{ hashFiles('examples/UDF-Examples/RAPIDS-accelerated-UDFs/src/main/cpp/**') }}
+          restore-keys: |
+            udf-native-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('examples/UDF-Examples/RAPIDS-accelerated-UDFs/Dockerfile', 'examples/UDF-Examples/RAPIDS-accelerated-UDFs/pom.xml') }}-
+      - name: Build all UDF examples
         working-directory: examples/UDF-Examples/RAPIDS-accelerated-UDFs
         run: |
           set -euo pipefail
-          mvn -B -ntp clean package
+          mkdir -p "$HOME/.m2/repository" "$HOME/.cache/udf-native/ccache" "$HOME/.cache/udf-native/cpm"
+          # Compile once without a GPU; keep caches outside the clean build directory.
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -v "$HOME/.m2/repository:/cache/maven" \
+            -v "$HOME/.cache/udf-native:/cache/native" \
+            -w /workspace/examples/UDF-Examples/RAPIDS-accelerated-UDFs \
+            -e HOME=/tmp -e CC=gcc -e CXX=g++ \
+            -e CCACHE_DIR=/cache/native/ccache -e CCACHE_BASEDIR=/workspace \
+            -e CPM_SOURCE_CACHE=/cache/native/cpm \
+            -e CMAKE_C_COMPILER_LAUNCHER=ccache \
+            -e CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -e CMAKE_CUDA_COMPILER_LAUNCHER=ccache \
+            --entrypoint /bin/bash udf-ci:local -c '
+              set -eo pipefail
+              source "/opt/rh/gcc-toolset-${TOOLSET_VERSION}/enable"
+              set -u
+              export JAVA_HOME
+              JAVA_HOME=$(dirname "$(dirname "$(readlink -f "$(command -v javac)")")")
+              ccache --max-size=500M
+              ccache --zero-stats
+              trap "ccache --show-stats" EXIT
+
+              # A100, L4, H100, RTX PRO 6000; retain PTX for newer GPUs.
+              mvn -B -ntp clean package -Pudf-native-examples \
+                -DUSE_PREBUILT_CUDF=ON -DGPU_ARCHS="80-real;89-real;90-real;120" \
+                -DCPP_PARALLEL_LEVEL="$(nproc)" -Dmaven.repo.local=/cache/maven
+              udf_jars=(target/rapids-4-spark-udf-examples*.jar)
+              [[ ${#udf_jars[@]} -eq 1 ]]
+              jar tf "${udf_jars[0]}" | grep -Fx "amd64/Linux/libudfexamplesjni.so"
+            '
           printf '%s\n' "$GITHUB_SHA" > target/gpu-ci-source-sha.txt
       - name: Upload test artifacts
         id: artifacts
