@@ -47,9 +47,29 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
+      - name: Pull published native toolchain
+        id: toolchain
+        run: |
+          set -euo pipefail
+          dockerfile=examples/UDF-Examples/RAPIDS-accelerated-UDFs/Dockerfile
+          checksum=$(sha256sum "$dockerfile" | cut -d ' ' -f 1)
+          image="ghcr.io/${GITHUB_REPOSITORY,,}/udf-native-toolchain:dockerfile-$checksum"
+
+          # No publishing credentials in PR builds. A new Dockerfile builds locally until published.
+          if timeout 5m docker pull --platform linux/amd64 "$image"; then
+            docker tag "$image" udf-ci:local
+            digest=$(docker image inspect --format '{{index .RepoDigests 0}}' "$image")
+            printf 'available=true\n' >> "$GITHUB_OUTPUT"
+            printf 'Native toolchain: %s\n' "$digest" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::Published native toolchain unavailable; building the checked-out Dockerfile."
+            printf 'Native toolchain: local build (published image unavailable).\n' >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Set up Docker Buildx
+        if: steps.toolchain.outputs.available != 'true'
         uses: docker/setup-buildx-action@v4.4.1
       - name: Build cached native toolchain
+        if: steps.toolchain.outputs.available != 'true'
         uses: docker/build-push-action@v7.4.0
         with:
           context: examples/UDF-Examples/RAPIDS-accelerated-UDFs
@@ -104,7 +124,7 @@ jobs:
               trap "ccache --show-stats" EXIT
 
               # A100, L4, H100, RTX PRO 6000; retain PTX for newer GPUs.
-              mvn -B -ntp clean package -Pudf-native-examples \
+              mvn -B clean package -Pudf-native-examples \
                 -DUSE_PREBUILT_CUDF=ON -DGPU_ARCHS="80-real;89-real;90-real;120" \
                 -DCPP_PARALLEL_LEVEL="$(nproc)" -Dmaven.repo.local=/cache/maven
               udf_jars=(target/rapids-4-spark-udf-examples*.jar)

@@ -1,0 +1,101 @@
+# Copyright (c) 2026, NVIDIA CORPORATION.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: UDF native toolchain image
+
+on:
+  schedule:
+    - cron: '37 2 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/udf-native-image.yml
+      - examples/UDF-Examples/RAPIDS-accelerated-UDFs/Dockerfile
+
+permissions:
+  contents: read
+
+concurrency:
+  group: udf-native-image
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: >-
+      github.repository == 'NVIDIA/cudf-spark-examples' &&
+      github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout trusted image source
+        uses: NVIDIA/spark-rapids-common/checkout@main
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4.4.1
+      - name: Build and smoke-test native toolchain
+        run: |
+          set -euo pipefail
+          context=examples/UDF-Examples/RAPIDS-accelerated-UDFs
+          # Refresh base-image and OS packages even when the Dockerfile has not changed.
+          docker buildx build --pull --no-cache --platform linux/amd64 --load \
+            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --tag udf-ci:local "$context"
+
+          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+            --entrypoint /bin/bash udf-ci:local -c '
+              set -eo pipefail
+              source "/opt/rh/gcc-toolset-${TOOLSET_VERSION}/enable"
+              set -u
+              gcc --version
+              g++ --version
+              nvcc --version
+              cmake --version
+              ninja --version
+              ccache --version
+              javac -version
+              mvn -B --version
+            '
+      - name: Publish and verify anonymous access
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          dockerfile=examples/UDF-Examples/RAPIDS-accelerated-UDFs/Dockerfile
+          checksum=$(sha256sum "$dockerfile" | cut -d ' ' -f 1)
+          image="ghcr.io/${GITHUB_REPOSITORY,,}/udf-native-toolchain"
+          anonymous_config=$(mktemp -d)
+          trap 'docker logout ghcr.io; rm -rf "$anonymous_config"' EXIT
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USER" --password-stdin
+
+          # Only promote a smoke-tested, anonymously readable candidate.
+          docker tag udf-ci:local "$image:candidate"
+          docker push "$image:candidate"
+          reference=$(docker image inspect --format '{{index .RepoDigests 0}}' "$image:candidate")
+          if ! docker --config "$anonymous_config" pull --platform linux/amd64 "$reference"; then
+            echo "::error::Verify GHCR availability and make the udf-native-toolchain package public, then rerun. The consumer tag has not been updated."
+            exit 1
+          fi
+
+          docker buildx imagetools create --prefer-index=false \
+            --tag "$image:dockerfile-$checksum" "$reference"
+          printf 'Published %s:dockerfile-%s from %s.\n' \
+            "$image" "$checksum" "$reference" >> "$GITHUB_STEP_SUMMARY"

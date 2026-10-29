@@ -126,6 +126,23 @@ docker build -t my-local:my-udf-example .
 nvidia-docker run -it my-local:my-udf-example
 ```
 
+#### CI Toolchain Image
+
+The repository's **UDF native toolchain image** workflow builds this Dockerfile daily at
+02:37 UTC, on changes to the Dockerfile or publishing workflow on `main`, and on manual dispatch.
+It uses GitHub's default CPU runner and publishes only from trusted `main` runs to
+`ghcr.io/nvidia/cudf-spark-examples/udf-native-toolchain`. It does not use the common daily
+image publisher. The image contains build tools, not compiled UDFs or version-specific cuDF libraries.
+
+GPU CI pulls the `dockerfile-<SHA256-of-Dockerfile>` tag and records the resolved image digest.
+If that image cannot be pulled, CI builds the checked-out Dockerfile with the existing layer cache.
+Native UDF compilation still runs for the approved source, with Maven, CPM, and compiler caches.
+
+On the first publication, a package administrator must make the GHCR package public and rerun the
+workflow. Anonymous access and toolchain smoke checks must pass before the consumer tag is updated.
+A failed refresh leaves the previous consumer tag unchanged. Until this workflow is merged and the
+first image is published, PR builds continue using the local-build fallback.
+
 ### Build the udf-examples jar
 
 #### Option 1: Fast Build Using Prebuilt libcudf (Recommended)
