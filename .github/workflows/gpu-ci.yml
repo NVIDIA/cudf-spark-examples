@@ -72,14 +72,8 @@ jobs:
           retention-days: 2
 
   gpu:
-    name: GPU sanity (${{ matrix.run }})
+    name: GPU sanity
     needs: build
-    # Temporary validation: independent runs share one CPU build and each retain queue fallback.
-    strategy:
-      fail-fast: false
-      max-parallel: 4
-      matrix:
-        run: [1, 2, 3, 4]
     runs-on: ubuntu-latest
     timeout-minutes: 70
     permissions:
@@ -95,15 +89,14 @@ jobs:
           workflow-ref: ${{ github.ref_name }}
           source-ref: ${{ github.ref }}
           source-sha: ${{ github.sha }}
-          workload: >-
-            {"artifact-id":"${{ needs.build.outputs.artifact-id }}","fail-worker":${{ matrix.run == 1 }}}
-          queue-timeout-minutes: '1'
+          workload: ${{ toJSON(needs.build.outputs) }}
+          queue-timeout-minutes: '10'
           execution-timeout-minutes: '15'
-          # Temporary validation: reverse the candidate order to exercise queue fallback.
+          # Try compatible pools in preference order; only queued workers can fall back.
           runners: >-
             [
-              {"group":"nv-gpu-general","labels":"linux-amd64-gpu-l4-latest-1"},
-              {"group":"nv-gpu-amd64-a100-1gpu","labels":"linux-amd64-gpu-a100-latest-1"},
+              {"group":"nv-gpu-amd64-rtxpro6000-1gpu","labels":"linux-amd64-gpu-rtxpro6000-latest-1"},
               {"group":"nv-gpu-amd64-h100-1gpu","labels":"linux-amd64-gpu-h100-latest-1"},
-              {"group":"nv-gpu-amd64-rtxpro6000-1gpu","labels":"linux-amd64-gpu-rtxpro6000-latest-1"}
+              {"group":"nv-gpu-amd64-a100-1gpu","labels":"linux-amd64-gpu-a100-latest-1"},
+              {"group":"nv-gpu-general","labels":"linux-amd64-gpu-l4-latest-1"}
             ]
