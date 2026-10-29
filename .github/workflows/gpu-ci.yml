@@ -1,0 +1,183 @@
+# Copyright (c) 2026, NVIDIA CORPORATION.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: GPU CI pilot
+
+# copy-pr-bot pushes the approved PR head here, not a synthetic merge commit.
+on:
+  push:
+    branches:
+      - 'pull-request/[0-9]+'
+    paths:
+      - .github/workflows/gpu-ci*.yml
+      - examples/UDF-Examples/RAPIDS-accelerated-UDFs/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gpu-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TZ: UTC
+
+jobs:
+  build:
+    name: Build GPU test artifacts
+    if: github.repository == 'NVIDIA/cudf-spark-examples'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      artifact-id: ${{ steps.artifacts.outputs.artifact-id }}
+    steps:
+      - name: Checkout approved source
+        uses: NVIDIA/spark-rapids-common/checkout@main
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Pull published native toolchain
+        id: toolchain
+        run: |
+          set -euo pipefail
+          dockerfile=examples/UDF-Examples/RAPIDS-accelerated-UDFs/Dockerfile
+          checksum=$(sha256sum "$dockerfile" | cut -d ' ' -f 1)
+          image="ghcr.io/${GITHUB_REPOSITORY,,}/udf-native-toolchain:dockerfile-$checksum"
+
+          # No publishing credentials in PR builds. A new Dockerfile builds locally until published.
+          if timeout 5m docker pull --platform linux/amd64 "$image"; then
+            docker tag "$image" udf-ci:local
+            digest=$(docker image inspect --format '{{index .RepoDigests 0}}' "$image")
+            printf 'available=true\n' >> "$GITHUB_OUTPUT"
+            printf 'Native toolchain: %s\n' "$digest" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::Published native toolchain unavailable; building the checked-out Dockerfile."
+            printf 'Native toolchain: local build (published image unavailable).\n' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Set up Docker Buildx
+        if: steps.toolchain.outputs.available != 'true'
+        uses: docker/setup-buildx-action@v4.4.1
+      - name: Build cached native toolchain
+        if: steps.toolchain.outputs.available != 'true'
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: examples/UDF-Examples/RAPIDS-accelerated-UDFs
+          platforms: linux/amd64
+          load: true
+          tags: udf-ci:local
+          cache-from: type=gha,scope=udf-native-toolchain
+          cache-to: type=gha,scope=udf-native-toolchain,mode=max,ignore-error=true
+        env:
+          DOCKER_BUILD_RECORD_RETENTION_DAYS: '2'
+      - name: Cache Maven dependencies
+        uses: actions/cache@v6.1.0
+        with:
+          path: ~/.m2/repository
+          key: udf-maven-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('examples/UDF-Examples/RAPIDS-accelerated-UDFs/pom.xml') }}
+          restore-keys: |
+            udf-maven-${{ runner.os }}-${{ runner.arch }}-
+      - name: Cache native compilation and dependency sources
+        uses: actions/cache@v6.1.0
+        with:
+          path: |
+            ~/.cache/udf-native/ccache
+            ~/.cache/udf-native/cpm
+          key: udf-native-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('examples/UDF-Examples/RAPIDS-accelerated-UDFs/Dockerfile', 'examples/UDF-Examples/RAPIDS-accelerated-UDFs/pom.xml') }}-${{ hashFiles('examples/UDF-Examples/RAPIDS-accelerated-UDFs/src/main/cpp/**') }}
+          restore-keys: |
+            udf-native-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('examples/UDF-Examples/RAPIDS-accelerated-UDFs/Dockerfile', 'examples/UDF-Examples/RAPIDS-accelerated-UDFs/pom.xml') }}-
+      - name: Build all UDF examples
+        working-directory: examples/UDF-Examples/RAPIDS-accelerated-UDFs
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.m2/repository" "$HOME/.cache/udf-native/ccache" "$HOME/.cache/udf-native/cpm"
+          # Compile once without a GPU; keep caches outside the clean build directory.
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -v "$HOME/.m2/repository:/cache/maven" \
+            -v "$HOME/.cache/udf-native:/cache/native" \
+            -w /workspace/examples/UDF-Examples/RAPIDS-accelerated-UDFs \
+            -e HOME=/tmp -e CC=gcc -e CXX=g++ \
+            -e CCACHE_DIR=/cache/native/ccache -e CCACHE_BASEDIR=/workspace \
+            -e CPM_SOURCE_CACHE=/cache/native/cpm \
+            -e CMAKE_C_COMPILER_LAUNCHER=ccache \
+            -e CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -e CMAKE_CUDA_COMPILER_LAUNCHER=ccache \
+            --entrypoint /bin/bash udf-ci:local -c '
+              set -eo pipefail
+              source "/opt/rh/gcc-toolset-${TOOLSET_VERSION}/enable"
+              set -u
+              export JAVA_HOME
+              JAVA_HOME=$(dirname "$(dirname "$(readlink -f "$(command -v javac)")")")
+              ccache --max-size=500M
+              ccache --zero-stats
+              trap "ccache --show-stats" EXIT
+
+              # A100, L4, H100, RTX PRO 6000; retain PTX for newer GPUs.
+              mvn -B clean package -Pudf-native-examples \
+                -DUSE_PREBUILT_CUDF=ON -DGPU_ARCHS="80-real;89-real;90-real;120" \
+                -DCPP_PARALLEL_LEVEL="$(nproc)" -Dmaven.repo.local=/cache/maven
+              udf_jars=(target/rapids-4-spark-udf-examples*.jar)
+              [[ ${#udf_jars[@]} -eq 1 ]]
+              jar tf "${udf_jars[0]}" | grep -Fx "amd64/Linux/libudfexamplesjni.so"
+
+              # The UDF jar does not bundle these shared libraries; the GPU worker needs both.
+              mkdir -p target/native-runtime
+              cp -L target/cpp-build/_deps/rmm-build/librmm.so \
+                target/cpp-build/_deps/rapids_logger-build/librapids_logger.so \
+                target/native-runtime/
+            '
+          printf '%s\n' "$GITHUB_SHA" > target/gpu-ci-source-sha.txt
+      - name: Upload test artifacts
+        id: artifacts
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: gpu-ci-build-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            examples/UDF-Examples/RAPIDS-accelerated-UDFs/target/rapids-4-spark-udf-examples*.jar
+            examples/UDF-Examples/RAPIDS-accelerated-UDFs/target/dependency/rapids-4-spark*.jar
+            examples/UDF-Examples/RAPIDS-accelerated-UDFs/target/native-runtime/*.so
+            examples/UDF-Examples/RAPIDS-accelerated-UDFs/target/gpu-ci-source-sha.txt
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 2
+
+  gpu:
+    name: GPU sanity
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      # Only the shared action receives write access; this job never executes PR code.
+      - name: Run GPU tests with queue fallback
+        uses: NVIDIA/spark-rapids-common/runner-queue-fallback@main
+        with:
+          workflow: gpu-ci-worker.yml
+          # Full-SHA approval covers this copied branch's worker definition as well as its tests.
+          workflow-ref: ${{ github.ref_name }}
+          source-ref: ${{ github.ref }}
+          source-sha: ${{ github.sha }}
+          workload: ${{ toJSON(needs.build.outputs) }}
+          queue-timeout-minutes: '10'
+          execution-timeout-minutes: '15'
+          # Try compatible pools in preference order; only queued workers can fall back.
+          runners: >-
+            [
+              {"group":"nv-gpu-amd64-rtxpro6000-1gpu","labels":"linux-amd64-gpu-rtxpro6000-latest-1"},
+              {"group":"nv-gpu-amd64-h100-1gpu","labels":"linux-amd64-gpu-h100-latest-1"},
+              {"group":"nv-gpu-amd64-a100-1gpu","labels":"linux-amd64-gpu-a100-latest-1"},
+              {"group":"nv-gpu-general","labels":"linux-amd64-gpu-l4-latest-1"}
+            ]
