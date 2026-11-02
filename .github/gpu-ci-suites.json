@@ -1,0 +1,20 @@
+{
+  "shared_paths": [
+    ".github/gpu-ci-suites.json",
+    ".github/workflows/gpu-ci.yml",
+    ".github/workflows/gpu-ci-worker.yml"
+  ],
+  "suites": {
+    "udf": {
+      "enabled": true,
+      "comment": "Native and non-native UDF examples; skip Markdown-only changes.",
+      "paths": [
+        "examples/UDF-Examples/RAPIDS-accelerated-UDFs/",
+        ".github/workflows/udf-build.yml",
+        ".github/workflows/udf-native-image.yml"
+      ],
+      "exclude_paths": ["**/*.md"],
+      "jobs": ["build", "gpu-test"]
+    }
+  }
+}

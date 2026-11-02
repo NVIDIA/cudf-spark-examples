@@ -1,0 +1,120 @@
+# Copyright (c) 2026, NVIDIA CORPORATION.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: GPU CI
+
+# For PRs targeting main, a maintainer approves /ok to test <full-head-SHA>.
+# copy-pr-bot pushes that exact commit here; each new head needs new approval.
+# Selection checks the full PR diff against .github/gpu-ci-suites.json:
+# Catalog changes select all enabled suites; bot configuration alone does not.
+# UDF jobs: ["build", "gpu-test"] are workflow IDs: CPU artifact build and UDF tests.
+# Both must succeed when selected; the catalog does not create jobs or choose runners.
+# exclude_paths: ["**/*.md"] filters only files matched by this suite's paths.
+# It does not affect files outside that scope or other suites; it is not a global exclusion.
+# Shared CI workflow changes still select all enabled suites, regardless of exclusions.
+# To pause a suite, set enabled: false and record the reason in its comment.
+# Disabled suites skip their jobs even for shared paths; selection and the gate still run.
+# - No matching path: skip build/GPU jobs; pass the gate if selection succeeds.
+# - Matching path: build once, run the selected tests, and require all to pass.
+# Even unaffected PRs need approval; no gate is reported before the copied push.
+on:
+  push:
+    branches:
+      - 'pull-request/[0-9]+'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: gpu-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TZ: UTC
+
+jobs:
+  select:
+    name: Select GPU test suites
+    if: github.repository == 'NVIDIA/cudf-spark-examples'
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    outputs:
+      suites: ${{ steps.select.outputs.suites }}
+      required-jobs: ${{ steps.select.outputs.required-jobs }}
+    steps:
+      - name: Checkout approved source
+        uses: NVIDIA/spark-rapids-common/checkout@main
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Select suites from the full PR diff
+        id: select
+        uses: NVIDIA/spark-rapids-common/workflow-suite-selector@main
+        with:
+          catalog-path: .github/gpu-ci-suites.json
+          base-branch: main
+          selector-job: select
+
+  build:
+    name: Build UDF test artifacts
+    needs: select
+    if: contains(fromJSON(needs.select.outputs.suites), 'udf')
+    permissions:
+      contents: read
+    # Same recipe/cache keys as trusted main; artifacts remain in this caller run.
+    uses: ./.github/workflows/udf-build.yml
+
+  gpu-test:
+    name: UDF tests
+    needs: build
+    runs-on: ubuntu-latest
+    # Six 15-minute queues, one 15-minute test run, and startup/cleanup overhead.
+    timeout-minutes: 130
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      # Only the shared action receives write access; this job never executes PR code.
+      - name: Run UDF tests with queue fallback
+        uses: NVIDIA/spark-rapids-common/runner-queue-fallback@main
+        with:
+          workflow: gpu-ci-worker.yml
+          # Full-SHA approval covers this copied branch's worker definition as well as its tests.
+          workflow-ref: ${{ github.ref_name }}
+          source-ref: ${{ github.ref }}
+          source-sha: ${{ github.sha }}
+          workload: ${{ toJSON(needs.build.outputs) }}
+          # Common owns the Linux amd64 single-GPU pools; only queued workers can fall back.
+          runner-type: gpu-amd64
+          queue-timeout-minutes: '15'
+          execution-timeout-minutes: '15'
+
+  # After affected and unaffected paths are validated, require
+  # "GPU CI gate" on main, not the worker check. Keep signoff-check required too.
+  # always() reports failures even when a prerequisite failed or was skipped.
+  # New suites need catalog entries, workload jobs, and direct needs entries here.
+  gate:
+    name: GPU CI gate
+    if: always() && github.repository == 'NVIDIA/cudf-spark-examples'
+    needs: [select, build, gpu-test]
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Check selected suite results
+        uses: NVIDIA/spark-rapids-common/workflow-result-gate@main
+        with:
+          needs: ${{ toJSON(needs) }}
+          required-jobs: ${{ needs.select.outputs.required-jobs }}
