@@ -101,7 +101,7 @@ jobs:
           queue-timeout-minutes: '15'
           execution-timeout-minutes: '15'
 
-  # After the common action is merged and both paths are validated, require
+  # After affected and unaffected paths are validated, require
   # "GPU CI gate" on main, not the worker check. Keep signoff-check required too.
   # always() reports failures even when a prerequisite failed or was skipped.
   # New suites need catalog entries, workload jobs, and direct needs entries here.

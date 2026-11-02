@@ -13,13 +13,9 @@
 # limitations under the License.
 
 name: GPU CI worker
-run-name: ${{ inputs.request-id || 'Register GPU worker for PR validation' }}
+run-name: ${{ inputs.request-id }}
 
 on:
-  # Register the workflow before merge. This event skips the worker and allocates no GPU.
-  pull_request:
-    paths:
-      - .github/workflows/gpu-ci*.yml
   workflow_dispatch:
     inputs:
       request-id:
