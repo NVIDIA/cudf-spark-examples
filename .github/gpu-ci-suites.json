@@ -5,6 +5,8 @@
   ],
   "suites": {
     "udf": {
+      "enabled": true,
+      "comment": "Native and non-native UDF examples.",
       "paths": [
         "examples/UDF-Examples/RAPIDS-accelerated-UDFs/",
         ".github/workflows/udf-native-image.yml"

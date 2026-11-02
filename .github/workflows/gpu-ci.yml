@@ -18,6 +18,8 @@ name: GPU CI pilot
 # copy-pr-bot pushes that exact commit here; each new head needs new approval.
 # Selection checks the full PR diff against .github/gpu-ci-suites.json:
 # Bot configuration and the catalog itself are not workload-triggering paths.
+# To pause a suite, set enabled: false and record the reason in its comment.
+# Disabled suites skip their jobs even for shared paths; selection and the gate still run.
 # - No matching path: skip build/GPU jobs; pass the gate if selection succeeds.
 # - Matching path: build once, run the selected tests, and require all to pass.
 # Even unaffected PRs need approval; no gate is reported before the copied push.
@@ -61,7 +63,7 @@ jobs:
           selector-job: select
 
   build:
-    name: Build GPU test artifacts
+    name: Build UDF test artifacts
     needs: select
     if: contains(fromJSON(needs.select.outputs.suites), 'udf')
     runs-on: ubuntu-latest
@@ -184,7 +186,7 @@ jobs:
           retention-days: 2
 
   gpu:
-    name: GPU sanity
+    name: UDF tests
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 70
@@ -193,7 +195,7 @@ jobs:
       actions: write
     steps:
       # Only the shared action receives write access; this job never executes PR code.
-      - name: Run GPU tests with queue fallback
+      - name: Run UDF tests with queue fallback
         uses: NVIDIA/spark-rapids-common/runner-queue-fallback@main
         with:
           workflow: gpu-ci-worker.yml
