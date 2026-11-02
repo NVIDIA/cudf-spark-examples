@@ -1,12 +1,12 @@
 # GPU-Accelerated Spark Connect Server
 
 This project demonstrates how to set up a GPU-accelerated Spark server using Apache Spark 4.0
-with Spark Connect, featuring the RAPIDS Accelerator.
+with Spark Connect, featuring the NVIDIA cuDF plugin for Apache Spark.
 
 ## 🚀 Key Features
 
 - **Apache Spark 4.0** with cutting-edge Spark Connect capabilities
-- **GPU acceleration** via RAPIDS Accelerator
+- **GPU acceleration** via the cuDF plugin
 - **MLlib over Spark Connect** - new in Spark 4.0
 - **Zero-code-change acceleration** - existing Spark applications automatically benefit
 - **Jupyter Lab integration** for interactive development
@@ -25,7 +25,7 @@ not have GPU capability
 service requiring and having access to the host GPUs 
 
 ### Middle Tier 
-3. **Spark Connect Server** (`spark-connect-server`) - gRPC interface with the RAPIDS integration
+3. **Spark Connect Server** (`spark-connect-server`) - gRPC interface with the cuDF plugin integration
 
 ### Proxy Service
 4. nginx configured as provide access to various Apache Spark WebUI using the Docker network
@@ -149,8 +149,8 @@ path. Otherwise, we use variables starting with `local_`.
 - **Features**: GPU resource discovery and task execution
 
 ### Spark Connect Server
-- **Image**: Custom build based on `apache/spark:4.0.0` with Spark RAPIDS ETL and ML Plugins
-- **RAPIDS Version**: 26.06.0 for CUDA 12
+- **Image**: Custom build based on `apache/spark:4.0.0` with the cuDF plugin for ETL and Spark-Rapids-ML for ML
+- **cuDF plugin version**: 26.08.0 for CUDA 12
 - **Ports**: 15002 (gRPC), 4040 (Driver UI)
 - **Configuration**: Optimized for GPU acceleration with memory management
 
@@ -185,5 +185,5 @@ Spark executor logs can be accessed via the Spark UI as usual.
 
 - [Apache Spark 4.0 Documentation](https://spark.apache.org/docs/latest/)
 - [Spark Connect Guide](https://spark.apache.org/docs/latest/spark-connect-overview.html)
-- [NVIDIA RAPIDS Accelerator](https://nvidia.github.io/spark-rapids/)
+- [NVIDIA cuDF plugin for Apache Spark](https://nvidia.github.io/cudf-spark/)
 - [Data and AI Summit Session](https://www.databricks.com/dataaisummit/session/gpu-accelerated-spark-connect)

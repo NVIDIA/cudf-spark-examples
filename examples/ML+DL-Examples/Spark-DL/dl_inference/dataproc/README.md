@@ -74,4 +74,4 @@ Make sure you are in [this](./) directory.
 8. Open and run the notebook interactively with the **Python 3 kernel**.  
 The notebooks can be found under `Local Disk/spark-dl-notebooks` on the master node (folder icon on the top left > Local Disk).
 
-*Note that the RAPIDS Accelerator for Apache Spark is not applicable in this case, since [multiple GPUs per executor are not yet supported](https://docs.nvidia.com/spark-rapids/user-guide/latest/faq.html#why-are-multiple-gpus-per-executor-not-supported).
+*Note that the NVIDIA cuDF plugin for Apache Spark is not applicable in this case, since [multiple GPUs per executor are not yet supported](https://docs.nvidia.com/spark-rapids/user-guide/latest/faq.html#why-are-multiple-gpus-per-executor-not-supported).
