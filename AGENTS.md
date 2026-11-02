@@ -22,6 +22,7 @@
   GPU CI currently covers native and non-native UDFs, not every example.
 - `gpu-ci.yml` selects suites, builds artifacts once on CPU, coordinates GPU work,
   and reports `GPU CI gate`. `gpu-ci-worker.yml` executes the GPU tests.
+  `udf-build.yml` is the reusable CPU build and trusted-main cache warmer.
   `udf-native-image.yml` separately publishes the trusted build image.
 - Add or change a gated suite as one coordinated update: catalog `paths`,
   `exclude_paths`, `enabled`, `comment`, and `jobs`; matching workflow jobs and
@@ -31,7 +32,8 @@
 - Include relevant source, tests, build scripts, and image/workflow inputs in path
   coverage. Exclusions apply only inside that suite's included paths, not globally.
   `shared_paths` selects every enabled suite despite exclusions; use it only for
-  shared workload inputs, not automatically for the catalog or copy-pr-bot config.
+  shared workload inputs. Keep `.github/gpu-ci-suites.json` in `shared_paths` so
+  selection-policy changes validate all enabled suites; bot config stays separate.
   Pause a suite with `enabled: false` and an explanation in `comment`.
 - Keep selector and gate active when no workload matches. Do not add event-level
   path filtering to this gate workflow. Keep `if: always()` and list the selector
@@ -60,6 +62,11 @@
 - Preserve one CPU build, source-SHA-checked artifact handoff, and required native
   runtime libraries. Reuse Maven, CPM, and ccache; keep keys/toolchains compatible.
   Cache misses are optional; missing build artifacts or failed tests are not.
+- Main runs the same CPU build after every push, daily, or by manual dispatch
+  to seed caches available to new PRs. Later PR commits prefer their own branch
+  caches; commit-specific keys save their populated cache without overwriting a
+  previous entry. Do not copy PR caches into main or duplicate the build recipe.
+  Keep the warm-up CPU-only and tolerate an absent or evicted baseline cache.
 - Publish stable images only from trusted source in the separate image workflow.
   Distinguish a prebuilt image pull from the local Docker build fallback in evidence.
 
