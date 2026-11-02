@@ -53,11 +53,11 @@ jobs:
           persist-credentials: false
       - name: Select suites from the full PR diff
         id: select
-        uses: actions/github-script@v8
+        uses: NVIDIA/spark-rapids-common/workflow-suite-selector@main
         with:
-          script: |
-            const {select} = require('./.github/scripts/gpu-ci.cjs');
-            await select({github, context, core});
+          catalog-path: .github/gpu-ci-suites.json
+          base-branch: main
+          selector-job: select
 
   build:
     name: Build GPU test artifacts
@@ -133,7 +133,7 @@ jobs:
             -v "$HOME/.m2/repository:/cache/maven" \
             -v "$HOME/.cache/udf-native:/cache/native" \
             -w /workspace/examples/UDF-Examples/RAPIDS-accelerated-UDFs \
-            -e HOME=/tmp -e CC=gcc -e CXX=g++ \
+            -e HOME=/tmp \
             -e CCACHE_DIR=/cache/native/ccache -e CCACHE_BASEDIR=/workspace \
             -e CPM_SOURCE_CACHE=/cache/native/cpm \
             -e CMAKE_C_COMPILER_LAUNCHER=ccache \
@@ -143,6 +143,10 @@ jobs:
               set -eo pipefail
               source "/opt/rh/gcc-toolset-${TOOLSET_VERSION}/enable"
               set -u
+              # The existing CMake file reads CXX directly; supply the active toolset path.
+              export CC CXX
+              CC=$(command -v gcc)
+              CXX=$(command -v g++)
               export JAVA_HOME
               JAVA_HOME=$(dirname "$(dirname "$(readlink -f "$(command -v javac)")")")
               ccache --max-size=500M

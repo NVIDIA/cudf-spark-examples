@@ -2,7 +2,6 @@
   "shared_paths": [
     ".github/copy-pr-bot.yaml",
     ".github/gpu-ci-suites.json",
-    ".github/scripts/gpu-ci.cjs",
     ".github/workflows/gpu-ci.yml",
     ".github/workflows/gpu-ci-worker.yml"
   ],
