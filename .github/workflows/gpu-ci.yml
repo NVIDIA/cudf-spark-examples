@@ -80,8 +80,8 @@ jobs:
     name: UDF tests
     needs: build
     runs-on: ubuntu-latest
-    # Six 10-minute queues, one 15-minute test run, and startup/cleanup overhead.
-    timeout-minutes: 100
+    # Six 15-minute queues, one 15-minute test run, and startup/cleanup overhead.
+    timeout-minutes: 130
     permissions:
       contents: read
       actions: write
@@ -98,7 +98,7 @@ jobs:
           workload: ${{ toJSON(needs.build.outputs) }}
           # Common owns the Linux amd64 single-GPU pools; only queued workers can fall back.
           runner-type: gpu-amd64
-          queue-timeout-minutes: '10'
+          queue-timeout-minutes: '15'
           execution-timeout-minutes: '15'
 
   # After the common action is merged and both paths are validated, require
