@@ -14,6 +14,9 @@
 
 name: UDF native toolchain image
 
+# Publish build tools from trusted main; PR builds still compile their own UDFs.
+# On first publication, make the GHCR package public and rerun this workflow.
+# Until the image is available, PR builds use the Dockerfile/local-cache fallback.
 on:
   schedule:
     - cron: '37 2 * * *'

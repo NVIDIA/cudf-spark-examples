@@ -14,7 +14,12 @@
 
 name: GPU CI pilot
 
-# copy-pr-bot pushes the approved PR head here, not a synthetic merge commit.
+# For PRs targeting main, a maintainer approves /ok to test <full-head-SHA>.
+# copy-pr-bot pushes that exact commit here; each new head needs new approval.
+# Selection checks the full PR diff against .github/gpu-ci-suites.json:
+# - No matching path: skip build/GPU jobs; pass the gate if selection succeeds.
+# - Matching path: build once, run the selected tests, and require all to pass.
+# Even unaffected PRs need approval; no gate is reported before the copied push.
 on:
   push:
     branches:
@@ -203,6 +208,10 @@ jobs:
               {"group":"nv-gpu-general","labels":"linux-amd64-gpu-l4-latest-1"}
             ]
 
+  # After the common action is merged and both paths are validated, require
+  # "GPU CI gate" on main, not the worker check. Keep signoff-check required too.
+  # always() reports failures even when a prerequisite failed or was skipped.
+  # New suites need catalog entries, workload jobs, and direct needs entries here.
   gate:
     name: GPU CI gate
     if: always() && github.repository == 'NVIDIA/cudf-spark-examples'
