@@ -1,0 +1,130 @@
+# Copyright (c) 2026, NVIDIA CORPORATION.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: UDF build
+
+# One CPU build for approved PRs and the trusted main cache baseline. No GPU runs
+# or image publication here. PRs can restore main's caches, not sibling PR caches;
+# subsequent commits restore their own branch's entries first. Caches are optional.
+# Warm main after every merge/push and daily to keep its baseline available.
+# After merging this workflow, workflow_dispatch on main can seed it immediately.
+on:
+  workflow_call:
+    outputs:
+      artifact-id:
+        description: Built UDF artifacts for the calling PR's GPU worker
+        value: ${{ jobs.build.outputs.artifact-id }}
+  workflow_dispatch:
+  schedule:
+    - cron: '37 3 * * *'
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Different from the calling GPU coordinator's group, so it cannot cancel itself.
+concurrency:
+  group: udf-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build UDF test artifacts
+    # Direct warm-ups must use main; copied-head builds enter via the PR coordinator.
+    if: >-
+      github.repository == 'NVIDIA/cudf-spark-examples' &&
+      (github.ref == 'refs/heads/main' ||
+       (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/pull-request/')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TZ: UTC
+    outputs:
+      artifact-id: ${{ steps.artifacts.outputs.artifact-id }}
+    steps:
+      - name: Checkout build source
+        uses: NVIDIA/spark-rapids-common/checkout@main
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Pull published native toolchain
+        id: toolchain
+        run: bash examples/UDF-Examples/RAPIDS-accelerated-UDFs/ci/native-toolchain.sh pull
+      - name: Set up Docker Buildx
+        if: steps.toolchain.outputs.available != 'true'
+        uses: docker/setup-buildx-action@v4.4.1
+      - name: Build cached native toolchain
+        if: steps.toolchain.outputs.available != 'true'
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: examples/UDF-Examples/RAPIDS-accelerated-UDFs
+          platforms: linux/amd64
+          load: true
+          tags: udf-ci:local
+          cache-from: type=gha,scope=udf-native-toolchain
+          cache-to: type=gha,scope=udf-native-toolchain,mode=max,ignore-error=true
+        env:
+          DOCKER_BUILD_RECORD_RETENTION_DAYS: '2'
+      - name: Cache Maven dependencies
+        uses: actions/cache@v6.1.0
+        with:
+          path: ~/.m2/repository
+          key: udf-maven-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('examples/UDF-Examples/RAPIDS-accelerated-UDFs/pom.xml') }}
+          restore-keys: |
+            udf-maven-${{ runner.os }}-${{ runner.arch }}-
+      - name: Cache native compilation and dependency sources
+        uses: actions/cache@v6.1.0
+        with:
+          path: |
+            ~/.cache/udf-native/ccache
+            ~/.cache/udf-native/cpm
+          # Each new commit saves its populated cache; ccache validates individual inputs.
+          key: udf-native-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('examples/UDF-Examples/RAPIDS-accelerated-UDFs/Dockerfile', 'examples/UDF-Examples/RAPIDS-accelerated-UDFs/pom.xml') }}-${{ github.sha }}
+          restore-keys: |
+            udf-native-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('examples/UDF-Examples/RAPIDS-accelerated-UDFs/Dockerfile', 'examples/UDF-Examples/RAPIDS-accelerated-UDFs/pom.xml') }}-
+      - name: Build all UDF examples
+        working-directory: examples/UDF-Examples/RAPIDS-accelerated-UDFs
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.m2/repository" "$HOME/.cache/udf-native/ccache" "$HOME/.cache/udf-native/cpm"
+          # Compile once without a GPU; keep caches outside the clean build directory.
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -v "$HOME/.m2/repository:/cache/maven" \
+            -v "$HOME/.cache/udf-native:/cache/native" \
+            -w /workspace/examples/UDF-Examples/RAPIDS-accelerated-UDFs \
+            -e HOME=/tmp \
+            -e CCACHE_DIR=/cache/native/ccache -e CCACHE_BASEDIR=/workspace \
+            -e CPM_SOURCE_CACHE=/cache/native/cpm \
+            -e CMAKE_C_COMPILER_LAUNCHER=ccache \
+            -e CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -e CMAKE_CUDA_COMPILER_LAUNCHER=ccache \
+            --entrypoint /bin/bash udf-ci:local ci/build-udfs.sh
+          printf '%s\n' "$GITHUB_SHA" > target/gpu-ci-source-sha.txt
+      - name: Upload test artifacts
+        # Main warms caches only; PR GPU workers require a same-run artifact ID.
+        if: startsWith(github.ref, 'refs/heads/pull-request/')
+        id: artifacts
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: gpu-ci-build-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            examples/UDF-Examples/RAPIDS-accelerated-UDFs/target/rapids-4-spark-udf-examples*.jar
+            examples/UDF-Examples/RAPIDS-accelerated-UDFs/target/dependency/rapids-4-spark*.jar
+            examples/UDF-Examples/RAPIDS-accelerated-UDFs/target/native-runtime/*.so
+            examples/UDF-Examples/RAPIDS-accelerated-UDFs/target/gpu-ci-source-sha.txt
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 2
