@@ -61,22 +61,7 @@ jobs:
           persist-credentials: false
       - name: Pull published native toolchain
         id: toolchain
-        run: |
-          set -euo pipefail
-          dockerfile=examples/UDF-Examples/RAPIDS-accelerated-UDFs/Dockerfile
-          checksum=$(sha256sum "$dockerfile" | cut -d ' ' -f 1)
-          image="ghcr.io/${GITHUB_REPOSITORY,,}/udf-native-toolchain:dockerfile-$checksum"
-
-          # No publishing credentials in PR builds. A new Dockerfile builds locally until published.
-          if timeout 5m docker pull --platform linux/amd64 "$image"; then
-            docker tag "$image" udf-ci:local
-            digest=$(docker image inspect --format '{{index .RepoDigests 0}}' "$image")
-            printf 'available=true\n' >> "$GITHUB_OUTPUT"
-            printf 'Native toolchain: %s\n' "$digest" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "::warning::Published native toolchain unavailable; building the checked-out Dockerfile."
-            printf 'Native toolchain: local build (published image unavailable).\n' >> "$GITHUB_STEP_SUMMARY"
-          fi
+        run: bash examples/UDF-Examples/RAPIDS-accelerated-UDFs/ci/native-toolchain.sh pull
       - name: Set up Docker Buildx
         if: steps.toolchain.outputs.available != 'true'
         uses: docker/setup-buildx-action@v4.4.1
@@ -126,34 +111,7 @@ jobs:
             -e CMAKE_C_COMPILER_LAUNCHER=ccache \
             -e CMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -e CMAKE_CUDA_COMPILER_LAUNCHER=ccache \
-            --entrypoint /bin/bash udf-ci:local -c '
-              set -eo pipefail
-              source "/opt/rh/gcc-toolset-${TOOLSET_VERSION}/enable"
-              set -u
-              # The existing CMake file reads CXX directly; supply the active toolset path.
-              export CC CXX
-              CC=$(command -v gcc)
-              CXX=$(command -v g++)
-              export JAVA_HOME
-              JAVA_HOME=$(dirname "$(dirname "$(readlink -f "$(command -v javac)")")")
-              ccache --max-size=500M
-              ccache --zero-stats
-              trap "ccache --show-stats" EXIT
-
-              # A100, L4/L40G, H100/H200, RTX PRO 6000; retain PTX for newer GPUs.
-              mvn -B clean package -Pudf-native-examples \
-                -DUSE_PREBUILT_CUDF=ON -DGPU_ARCHS="80-real;89-real;90-real;120" \
-                -DCPP_PARALLEL_LEVEL="$(nproc)" -Dmaven.repo.local=/cache/maven
-              udf_jars=(target/rapids-4-spark-udf-examples*.jar)
-              [[ ${#udf_jars[@]} -eq 1 ]]
-              jar tf "${udf_jars[0]}" | grep -Fx "amd64/Linux/libudfexamplesjni.so"
-
-              # The UDF jar does not bundle these shared libraries; the GPU worker needs both.
-              mkdir -p target/native-runtime
-              cp -L target/cpp-build/_deps/rmm-build/librmm.so \
-                target/cpp-build/_deps/rapids_logger-build/librapids_logger.so \
-                target/native-runtime/
-            '
+            --entrypoint /bin/bash udf-ci:local ci/build-udfs.sh
           printf '%s\n' "$GITHUB_SHA" > target/gpu-ci-source-sha.txt
       - name: Upload test artifacts
         # Main warms caches only; PR GPU workers require a same-run artifact ID.

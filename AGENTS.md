@@ -24,6 +24,11 @@
   and reports `GPU CI gate`. `gpu-ci-worker.yml` executes the GPU tests.
   `udf-build.yml` is the reusable CPU build and trusted-main cache warmer.
   `udf-native-image.yml` separately publishes the trusted build image.
+- Keep UDF-specific shell commands in the example's `ci/` scripts: image naming
+  and pull/refresh/publish in `native-toolchain.sh`, container compiler setup and
+  build/smoke checks in `build-udfs.sh`, and GPU execution in `test-udfs.sh`.
+  Workflows own triggers, permissions, caches, and artifact transfer. Reuse these
+  scripts instead of copying commands; preserve the local/Jenkins entry points.
 - Add or change a gated suite as one coordinated update: catalog `paths`,
   `exclude_paths`, `enabled`, `comment`, and `jobs`; matching workflow jobs and
   selection conditions; worker workload support if needed; and direct gate `needs`.

@@ -117,25 +117,7 @@ jobs:
             'pyspark==3.3.0' 'pytest==8.4.2' 'sre_yield==1.2'
           python -c 'import os, pyspark; print("SPARK_HOME=" + os.path.dirname(pyspark.__file__))' >> "$GITHUB_ENV"
       - name: Run UDF tests
-        working-directory: examples/UDF-Examples/RAPIDS-accelerated-UDFs
-        run: |
-          set -euo pipefail
-          nvidia-smi 2>&1 | tee "$RUNNER_TEMP/gpu-ci.log"
-          test -s target/native-runtime/librmm.so
-          test -s target/native-runtime/librapids_logger.so
-          export LD_LIBRARY_PATH="$PWD/target/native-runtime${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-          bash run_pyspark_from_build.sh --rapids_udf_example_native \
-            --junitxml="$RUNNER_TEMP/gpu-ci.xml" 2>&1 | tee -a "$RUNNER_TEMP/gpu-ci.log"
-          python - <<'PY'
-          import os
-          import xml.etree.ElementTree as ET
-
-          report = ET.parse(os.path.join(os.environ["RUNNER_TEMP"], "gpu-ci.xml"))
-          if not report.findall(".//testcase") or any(
-              report.findall(f".//{result}") for result in ("skipped", "failure", "error")
-          ):
-              raise SystemExit("UDF tests must execute and pass without skips")
-          PY
+        run: bash examples/UDF-Examples/RAPIDS-accelerated-UDFs/ci/test-udfs.sh
       - name: Upload GPU evidence
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7.0.2
