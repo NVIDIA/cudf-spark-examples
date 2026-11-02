@@ -18,6 +18,8 @@ name: GPU CI pilot
 # copy-pr-bot pushes that exact commit here; each new head needs new approval.
 # Selection checks the full PR diff against .github/gpu-ci-suites.json:
 # Bot configuration and the catalog itself are not workload-triggering paths.
+# UDF jobs: ["build", "gpu-test"] are workflow IDs: CPU artifact build and UDF tests.
+# Both must succeed when selected; the catalog does not create jobs or choose runners.
 # To pause a suite, set enabled: false and record the reason in its comment.
 # Disabled suites skip their jobs even for shared paths; selection and the gate still run.
 # - No matching path: skip build/GPU jobs; pass the gate if selection succeeds.
@@ -185,7 +187,7 @@ jobs:
           compression-level: 0
           retention-days: 2
 
-  gpu:
+  gpu-test:
     name: UDF tests
     needs: build
     runs-on: ubuntu-latest
@@ -222,7 +224,7 @@ jobs:
   gate:
     name: GPU CI gate
     if: always() && github.repository == 'NVIDIA/cudf-spark-examples'
-    needs: [select, build, gpu]
+    needs: [select, build, gpu-test]
     runs-on: ubuntu-slim
     timeout-minutes: 5
     permissions: {}
