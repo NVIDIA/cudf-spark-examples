@@ -35,10 +35,11 @@ jobs:
   select:
     name: Select GPU test suites
     if: github.repository == 'NVIDIA/cudf-spark-examples'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     timeout-minutes: 5
     outputs:
       suites: ${{ steps.select.outputs.suites }}
+      required-jobs: ${{ steps.select.outputs.required-jobs }}
     steps:
       - name: Checkout approved source
         uses: NVIDIA/spark-rapids-common/checkout@main
@@ -201,3 +202,17 @@ jobs:
               {"group":"nv-gpu-amd64-a100-1gpu","labels":"linux-amd64-gpu-a100-latest-1"},
               {"group":"nv-gpu-general","labels":"linux-amd64-gpu-l4-latest-1"}
             ]
+
+  gate:
+    name: GPU CI gate
+    if: always() && github.repository == 'NVIDIA/cudf-spark-examples'
+    needs: [select, build, gpu]
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Check selected suite results
+        uses: NVIDIA/spark-rapids-common/workflow-result-gate@main
+        with:
+          needs: ${{ toJSON(needs) }}
+          required-jobs: ${{ needs.select.outputs.required-jobs }}

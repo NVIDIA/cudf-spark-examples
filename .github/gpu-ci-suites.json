@@ -4,8 +4,7 @@
     ".github/gpu-ci-suites.json",
     ".github/scripts/gpu-ci.cjs",
     ".github/workflows/gpu-ci.yml",
-    ".github/workflows/gpu-ci-worker.yml",
-    ".github/workflows/gpu-ci-gate.yml"
+    ".github/workflows/gpu-ci-worker.yml"
   ],
   "suites": {
     "udf": {
@@ -13,7 +12,7 @@
         "examples/UDF-Examples/RAPIDS-accelerated-UDFs/",
         ".github/workflows/udf-native-image.yml"
       ],
-      "jobs": ["Build GPU test artifacts", "GPU sanity"]
+      "jobs": ["build", "gpu"]
     }
   }
 }

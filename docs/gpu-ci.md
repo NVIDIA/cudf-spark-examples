@@ -1,63 +1,70 @@
 # GPU CI
 
-GPU CI currently covers the native and non-native UDF examples. The lightweight
-`GPU CI gate` status evaluates every PR update targeting `main`. Changes outside the configured
-paths pass without allocating a GPU; affected changes require a successful CPU
-build and GPU test run for the current PR head.
+GPU CI currently covers the native and non-native UDF examples for PRs targeting
+`main`. One `GPU CI gate` job checks the selected suites in the approved
+copied-branch workflow. Changes
+outside the configured paths run only selection and the gate, without a build
+or GPU allocation. Affected changes require a successful CPU build and GPU test
+run for the approved PR head.
 
 ## Approval and results
 
-GPU execution still requires `/ok to test <full-head-SHA>`. The copied branch runs
-the coordinator, which builds once and dispatches a worker with queue fallback.
-The gate only accepts the latest matching coordinator run from copy-pr-bot's
-`push` event on `pull-request/<number>` at that exact SHA. Dispatched workers and
-their skipped PR-registration checks do not satisfy the gate directly.
+Every PR needs `/ok to test <full-head-SHA>` to produce the gate, including
+unaffected PRs. copy-pr-bot pushes that head to `pull-request/<number>`, which runs
+the workflow. Before approval the check is absent, so a required-check ruleset
+blocks merging. A new PR head needs new approval; there is no automatic GPU run.
 
-The gate remains pending while approval or execution is outstanding. A failed,
-cancelled, skipped, or missing required job cannot pass it. API/path-detection
-errors also block the gate rather than treating the PR as unaffected. The gate
-accepts a successful producer retained by "rerun failed jobs" within the same
-run and SHA, but a newer failed or skipped attempt overrides that job's old pass.
-Run/job metadata that changes during evaluation is rechecked up to three times;
-unresolved inconsistency blocks the gate instead of accepting an older success.
-It does not wait on a CPU runner for GPU work: coordinator lifecycle events refresh
-the status. Rerunning the requirement workflow refreshes a failed assessment.
-
-Suite selection uses the entire current PR diff, including deleted paths and both
+The selector checks the full current PR diff, including deleted paths and both
 sides of renames. A documentation-only follow-up push does not exempt an earlier
-UDF code change in the same PR. Incomplete file lists fail closed.
+UDF change in the same PR. API errors, incomplete file lists, non-main targets,
+and a copied SHA that no longer matches the PR head fail selection rather than
+skipping tests. Target-branch changes during selection also fail the check.
+
+The gate runs with `always()` and consumes job results from the same workflow
+using the common `workflow-result-gate` action. Selected jobs must succeed;
+skipped or missing required jobs cannot pass. Unselected jobs may skip, but
+failures and cancellations still fail the gate. The selector must always pass.
+Dispatched worker checks, including their skipped PR-registration checks, are
+not the required gate; the coordinator waits for and propagates worker results.
+
+This follows the approved-push aggregation pattern used by
+[cuDF](https://github.com/NVIDIA/cudf/blob/main/.github/workflows/pr.yaml), with
+explicit success requirements similar to
+[CuPy's result checks](https://github.com/cupy/cupy/blob/main/.github/workflows/ci.yml).
+The new GPU CI workflow does not need `pull_request_target`, `workflow_run`,
+status-write permissions, or a run-status polling controller. Selection and the
+gate use lightweight `ubuntu-slim` runners; Docker builds and the long-lived
+queue coordinator retain `ubuntu-latest`.
 
 ## Adding suites
 
-`.github/gpu-ci-suites.json` is the catalog shared by selection and enforcement.
-Paths ending in `/` match a directory recursively; other paths match an exact
-file. There are no glob patterns. Shared paths select all registered suites.
+`.github/gpu-ci-suites.json` is the repo-owned selection catalog. Paths ending in
+`/` match a directory recursively; other paths match an exact file. There are no
+glob patterns. Shared paths select all registered suites.
 
-To add a suite:
-
-1. Add a suite ID, affected paths, and exact required job names to the catalog.
+1. Add a suite ID, affected paths, and required workflow **job IDs** to the catalog.
 2. Add its build/test jobs to `gpu-ci.yml`, conditioned on that suite ID in
    `needs.select.outputs.suites`. Reuse the common queue-fallback action for GPU
-   execution, and make the coordinator job fail if its tests fail.
-3. Keep required job names unique. The gate requires every listed job to finish
-   successfully; listing only a downstream job could hide a skipped build.
+   execution, and propagate test failures from the coordinator.
+3. Add all new jobs directly to `gate.needs`, including build prerequisites.
+   GitHub's `needs` context does not include transitive dependencies. The shared
+   gate rejects required IDs absent from that context.
 
-For example, a later suite with a different examples directory and build/test
-jobs needs a new catalog entry and those workflow jobs, not a new gate controller.
-The privileged gate reads only trusted base/default-branch policy and GitHub
-metadata. It never checks out PR code or downloads worker artifacts. New policy
-entries take effect when merged into the trusted branch.
+The selector emits `required-jobs` containing itself and every selected suite's
+jobs. A later suite with different paths, builds, or runners needs only consumer
+configuration and workflow changes, not changes to the shared gate action.
+Reviewers approving a SHA must also review any changes to this CI policy.
 
 ## Initial activation
 
+Merge the common `workflow-result-gate` action before enabling this consumer.
 The gate, suite catalog, coordinator, and UDF worker are introduced together.
-After this PR is merged, verify `GPU CI gate` reports on an unaffected PR and on
-an approved UDF validation run. Then add **GPU CI gate**, with GitHub Actions as
-its source, to the required status checks for `main`, retaining `signoff-check`.
-Do not require `worker`, `GPU sanity`, or `Assess GPU CI requirement` instead.
+Validate both an approved unaffected PR and an approved UDF run, then configure
+**GPU CI gate**, with GitHub Actions as its source, as a required check for `main`,
+retaining `signoff-check`. Do not require `worker` or `GPU sanity` instead.
 
 This ruleset setting is repository administration, not a workflow-file change.
-Do not enable it before the trusted gate workflow is available, or apply it to
-release branches that do not yet contain the gate. Existing PRs need a new PR
-event (for example, a description edit) to initialize their status. This workflow
-does not yet implement merge-queue (`merge_group`) validation.
+Do not enable it before the workflow and common action are available, or apply
+it to release branches that do not contain the gate. Existing PRs need their
+branches updated to include this workflow and approval of the current head.
+This workflow does not yet implement merge-queue (`merge_group`) validation.
