@@ -20,7 +20,9 @@ name: GPU CI
 # Bot configuration and the catalog itself are not workload-triggering paths.
 # UDF jobs: ["build", "gpu-test"] are workflow IDs: CPU artifact build and UDF tests.
 # Both must succeed when selected; the catalog does not create jobs or choose runners.
-# Markdown-only UDF edits are excluded; shared CI workflow changes still select all enabled suites.
+# exclude_paths: ["**/*.md"] filters only files matched by this suite's paths.
+# It does not affect files outside that scope or other suites; it is not a global exclusion.
+# Shared CI workflow changes still select all enabled suites, regardless of exclusions.
 # To pause a suite, set enabled: false and record the reason in its comment.
 # Disabled suites skip their jobs even for shared paths; selection and the gate still run.
 # - No matching path: skip build/GPU jobs; pass the gate if selection succeeds.
