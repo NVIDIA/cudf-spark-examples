@@ -191,7 +191,8 @@ jobs:
     name: UDF tests
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 70
+    # Six 10-minute queues, one 15-minute test run, and startup/cleanup overhead.
+    timeout-minutes: 100
     permissions:
       contents: read
       actions: write
@@ -206,9 +207,10 @@ jobs:
           source-ref: ${{ github.ref }}
           source-sha: ${{ github.sha }}
           workload: ${{ toJSON(needs.build.outputs) }}
+          # Common owns the Linux amd64 single-GPU pools; only queued workers can fall back.
+          runner-type: gpu-amd64
           queue-timeout-minutes: '10'
           execution-timeout-minutes: '15'
-          # Omit runners to use common's GPU pools; only queued workers can fall back.
 
   # After the common action is merged and both paths are validated, require
   # "GPU CI gate" on main, not the worker check. Keep signoff-check required too.
