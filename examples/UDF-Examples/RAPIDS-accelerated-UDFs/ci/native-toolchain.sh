@@ -53,9 +53,14 @@ case "${1:-}" in
     # Only promote a smoke-tested, anonymously readable candidate.
     docker tag udf-ci:local "$image:candidate"
     docker push "$image:candidate"
-    reference=$(docker image inspect --format '{{index .RepoDigests 0}}' "$image:candidate")
+    # Buildx --load may put a local udf-ci digest before the pushed GHCR digest.
+    reference=$(docker image inspect --format '{{json .RepoDigests}}' "$image:candidate" |
+      jq -er --arg image "$image" '
+        map(select(startswith($image + "@sha256:"))) | unique |
+        if length == 1 then .[0] else error("Expected one digest for " + $image) end')
+    printf 'Verifying anonymous pull: %s\n' "$reference"
     if ! docker --config "$anonymous_config" pull --platform linux/amd64 "$reference"; then
-      echo "::error::Verify GHCR availability and make the udf-native-toolchain package public, then rerun. The consumer tag has not been updated."
+      echo "::error::Anonymous pull failed for $reference. Check registry availability and package visibility. The consumer tag has not been updated."
       exit 1
     fi
 
