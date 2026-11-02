@@ -1,0 +1,63 @@
+# Copyright (c) 2026, NVIDIA CORPORATION.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: UDF native toolchain image
+
+# Publish build tools from trusted main; PR builds still compile their own UDFs.
+# On first publication, make the GHCR package public and rerun this workflow.
+# Until the image is available, PR builds use the Dockerfile/local-cache fallback.
+on:
+  schedule:
+    - cron: '37 2 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/udf-native-image.yml
+      - examples/UDF-Examples/RAPIDS-accelerated-UDFs/Dockerfile
+      - examples/UDF-Examples/RAPIDS-accelerated-UDFs/ci/native-toolchain.sh
+      - examples/UDF-Examples/RAPIDS-accelerated-UDFs/ci/build-udfs.sh
+
+permissions:
+  contents: read
+
+concurrency:
+  group: udf-native-image
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: >-
+      github.repository == 'NVIDIA/cudf-spark-examples' &&
+      github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout trusted image source
+        uses: NVIDIA/spark-rapids-common/checkout@main
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4.4.1
+      - name: Build and smoke-test native toolchain
+        run: bash examples/UDF-Examples/RAPIDS-accelerated-UDFs/ci/native-toolchain.sh refresh
+      - name: Publish and verify anonymous access
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+        run: bash examples/UDF-Examples/RAPIDS-accelerated-UDFs/ci/native-toolchain.sh publish
