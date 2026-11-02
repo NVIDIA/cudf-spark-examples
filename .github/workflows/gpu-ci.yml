@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: GPU CI pilot
+name: GPU CI
 
 # For PRs targeting main, a maintainer approves /ok to test <full-head-SHA>.
 # copy-pr-bot pushes that exact commit here; each new head needs new approval.
@@ -20,6 +20,7 @@ name: GPU CI pilot
 # Bot configuration and the catalog itself are not workload-triggering paths.
 # UDF jobs: ["build", "gpu-test"] are workflow IDs: CPU artifact build and UDF tests.
 # Both must succeed when selected; the catalog does not create jobs or choose runners.
+# Markdown-only UDF edits are excluded; shared CI workflow changes still select all enabled suites.
 # To pause a suite, set enabled: false and record the reason in its comment.
 # Disabled suites skip their jobs even for shared paths; selection and the gate still run.
 # - No matching path: skip build/GPU jobs; pass the gate if selection succeeds.
@@ -158,7 +159,7 @@ jobs:
               ccache --zero-stats
               trap "ccache --show-stats" EXIT
 
-              # A100, L4, H100, RTX PRO 6000; retain PTX for newer GPUs.
+              # A100, L4/L40G, H100/H200, RTX PRO 6000; retain PTX for newer GPUs.
               mvn -B clean package -Pudf-native-examples \
                 -DUSE_PREBUILT_CUDF=ON -DGPU_ARCHS="80-real;89-real;90-real;120" \
                 -DCPP_PARALLEL_LEVEL="$(nproc)" -Dmaven.repo.local=/cache/maven
