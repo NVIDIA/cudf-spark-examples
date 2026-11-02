@@ -128,6 +128,8 @@ nvidia-docker run -it my-local:my-udf-example
 
 #### CI Toolchain Image
 
+See [GPU CI](../../../docs/gpu-ci.md) for path selection, approval, and the required status gate.
+
 The repository's **UDF native toolchain image** workflow builds this Dockerfile daily at
 02:37 UTC, on changes to the Dockerfile or publishing workflow on `main`, and on manual dispatch.
 It uses GitHub's default CPU runner and publishes only from trusted `main` runs to
