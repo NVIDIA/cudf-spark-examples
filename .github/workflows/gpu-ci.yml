@@ -17,6 +17,7 @@ name: GPU CI pilot
 # For PRs targeting main, a maintainer approves /ok to test <full-head-SHA>.
 # copy-pr-bot pushes that exact commit here; each new head needs new approval.
 # Selection checks the full PR diff against .github/gpu-ci-suites.json:
+# Bot configuration and the catalog itself are not workload-triggering paths.
 # - No matching path: skip build/GPU jobs; pass the gate if selection succeeds.
 # - Matching path: build once, run the selected tests, and require all to pass.
 # Even unaffected PRs need approval; no gate is reported before the copied push.
