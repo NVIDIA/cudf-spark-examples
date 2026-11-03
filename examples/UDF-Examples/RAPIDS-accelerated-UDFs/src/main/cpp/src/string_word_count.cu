@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022, NVIDIA CORPORATION.
+ * Copyright (c) 2021-2026, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,10 +18,10 @@
 
 #include <cudf/column/column_factories.hpp>
 #include <cudf/column/column_device_view.cuh>
+#include <cudf/null_mask.hpp>
 #include <cudf/strings/string_view.cuh>
+#include <cudf/utilities/default_stream.hpp>
 
-#include <rmm/cuda_stream_view.hpp>
-#include <rmm/device_buffer.hpp>
 #include <rmm/exec_policy.hpp>
 
 #include <thrust/iterator/counting_iterator.h>
@@ -68,7 +68,7 @@ std::unique_ptr<cudf::column> string_word_count(cudf::column_view const& strs) {
   }
 
   // the validity of the output matches the validity of the input
-  rmm::device_buffer null_mask = cudf::copy_bitmask(strs);
+  auto null_mask = cudf::copy_bitmask(strs);
 
   // allocate the column that will contain the word count results
   std::unique_ptr<cudf::column> result =
@@ -79,7 +79,7 @@ std::unique_ptr<cudf::column> string_word_count(cudf::column_view const& strs) {
       strs.null_count());
 
   // compute the word counts, writing into the result column data buffer
-  auto stream = rmm::cuda_stream_default;
+  auto stream = cudf::get_default_stream();
   auto strs_device_view = cudf::column_device_view::create(strs, stream);
   auto d_strs_view = *strs_device_view;
   thrust::transform(
