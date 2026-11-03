@@ -7,10 +7,10 @@ The notebook uses PCA to reduce a random dataset with 2048 feature dimensions to
 
 Please refer to the Spark-Rapids-ML [README](https://github.com/NVIDIA/spark-rapids-ml/blob/HEAD/python) to setup the RAPIDS conda environment and install Spark-Rapids-ML dependencies.
 
-## Download RAPIDS Jar from Maven Central
+## Download the NVIDIA cuDF plugin for Apache Spark jar from Maven Central
 
-Download the [Spark-Rapids plugin](https://nvidia.github.io/spark-rapids/docs/download.html#download-rapids-accelerator-for-apache-spark-v26060).
-For Spark-RAPIDS-ML version 26.06.0, download the RAPIDS jar from Maven Central: [rapids-4-spark_2.12-26.06.0.jar](https://repo1.maven.org/maven2/com/nvidia/rapids-4-spark_2.12/26.06.0/rapids-4-spark_2.12-26.06.0.jar).
+Download the [cuDF plugin](https://nvidia.github.io/cudf-spark/docs/download.html#download-rapids-accelerator-for-apache-spark-v26080).
+For Spark-RAPIDS-ML version 26.08.0, download the cuDF plugin jar from Maven Central: [rapids-4-spark_2.12-26.08.0.jar](https://repo1.maven.org/maven2/com/nvidia/rapids-4-spark_2.12/26.08.0/rapids-4-spark_2.12-26.08.0.jar).
 
 ## Running the Notebooks
 
