@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022, NVIDIA CORPORATION.
+ * Copyright (c) 2021-2026, NVIDIA CORPORATION.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,9 +24,9 @@
 #include <cudf/null_mask.hpp>
 #include <cudf/table/table_view.hpp>
 #include <cudf/utilities/bit.hpp>
+#include <cudf/utilities/default_stream.hpp>
 
-#include <rmm/cuda_stream_view.hpp>
-#include <rmm/device_buffer.hpp>
+#include <rmm/device_uvector.hpp>
 #include <rmm/exec_policy.hpp>
 
 #include <thrust/iterator/counting_iterator.h>
@@ -103,7 +103,7 @@ std::unique_ptr<cudf::column> cosine_similarity(cudf::lists_column_view const& l
     throw std::invalid_argument("null floats are not supported");
   }
 
-  auto const stream = rmm::cuda_stream_default;
+  auto const stream = cudf::get_default_stream();
 
   // Check if list sizes match by comparing offsets differences
   // Need to handle null lists: if either list is null, consider it valid (will be null in output)
