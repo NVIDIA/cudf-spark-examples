@@ -15,6 +15,7 @@
 name: UDF native toolchain image
 
 # Publish build tools from trusted main; PR builds still compile their own UDFs.
+# The stable :main tag carries Dockerfile-version metadata checked before reuse.
 # If anonymous access is denied, check GHCR package visibility before rerunning.
 # Until the image is available, PR builds use the Dockerfile/local-cache fallback.
 on:

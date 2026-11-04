@@ -20,33 +20,43 @@ context=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 checksum=$(sha256sum "$context/Dockerfile" | cut -d ' ' -f 1)
 image_name=udf-native-toolchain
 image="ghcr.io/${GITHUB_REPOSITORY,,}/$image_name"
-tag="$image:dockerfile-$checksum"
+tag="$image:main"
+# Version the toolchain recipe, not the examples project or release branch.
+image_version="dockerfile-$checksum"
 
 case "${1:-}" in
   config)
-    # Keep the exact Dockerfile checksum tag consumed by the existing pull path.
-    jq -cn --arg image "$image_name" --arg tag "dockerfile-$checksum" --arg context "$context" '{
-      image: $image, tag: $tag, context: $context, dockerfile: ($context + "/Dockerfile"),
+    jq -cn --arg image "$image_name" --arg version "$image_version" --arg context "$context" '{
+      image: $image, tag: "main", version: $version,
+      context: $context, dockerfile: ($context + "/Dockerfile"),
       platform: "linux/amd64", "smoke-test": ($context + "/ci/native-toolchain-smoke.sh")
     }'
     ;;
   pull)
-    # A new Dockerfile builds locally until its image is published.
+    # The shared tag is usable only when it matches this checkout's Dockerfile.
+    reason="published image unavailable"
     if timeout 5m docker pull --platform linux/amd64 "$tag"; then
-      docker tag "$tag" udf-ci:local
-      digest=$(docker image inspect --format '{{index .RepoDigests 0}}' "$tag")
-      printf 'available=true\n' >> "$GITHUB_OUTPUT"
-      printf 'Native toolchain: %s\n' "$digest" >> "$GITHUB_STEP_SUMMARY"
-    else
-      echo "::warning::Published native toolchain unavailable; building the checked-out Dockerfile."
-      printf 'Native toolchain: local build (published image unavailable).\n' >> "$GITHUB_STEP_SUMMARY"
+      if metadata=$(docker image inspect "$tag") &&
+        image_id=$(jq -er --arg version "$image_version" '
+          .[0] | select(.Config.Labels["org.opencontainers.image.version"] == $version) |
+          .Id | select(type == "string" and test("^sha256:[0-9a-f]{64}$"))' <<< "$metadata"); then
+        # Use the exact inspected image even if another pull changes the local tag.
+        docker tag "$image_id" udf-ci:local
+        printf 'available=true\n' >> "$GITHUB_OUTPUT"
+        printf 'Native toolchain: %s (%s), Dockerfile matched.\n' "$tag" "$image_id" >> "$GITHUB_STEP_SUMMARY"
+        exit 0
+      fi
+      reason="published image metadata does not match the checked-out Dockerfile"
     fi
+    echo "::warning::Native toolchain: $reason; building the checked-out Dockerfile."
+    printf 'Native toolchain: local build (%s).\n' "$reason" >> "$GITHUB_STEP_SUMMARY"
     ;;
   refresh)
     # Refresh base-image and OS packages even when the Dockerfile has not changed.
     docker buildx build --pull --no-cache --platform linux/amd64 --load \
       --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
       --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+      --label "org.opencontainers.image.version=$image_version" \
       --tag udf-ci:local "$context"
 
     bash "$context/ci/native-toolchain-smoke.sh" udf-ci:local linux/amd64
