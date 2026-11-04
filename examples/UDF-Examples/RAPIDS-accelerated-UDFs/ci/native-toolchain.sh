@@ -26,10 +26,12 @@ image_version="dockerfile-$checksum"
 
 case "${1:-}" in
   config)
+    # Fresh publication seeds the layer cache used by udf-build's local-image fallback.
     jq -cn --arg image "$image_name" --arg version "$image_version" --arg context "$context" '{
       image: $image, tag: "main", version: $version,
       context: $context, dockerfile: ($context + "/Dockerfile"),
-      platform: "linux/amd64", "smoke-test": ($context + "/ci/native-toolchain-smoke.sh")
+      platform: "linux/amd64", "smoke-test": ($context + "/ci/native-toolchain-smoke.sh"),
+      "cache-to": ["type=gha,version=2,scope=udf-native-toolchain-amd64,mode=max,timeout=2m,ignore-error=true"]
     }'
     ;;
   pull)

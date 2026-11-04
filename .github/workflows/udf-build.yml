@@ -73,8 +73,11 @@ jobs:
           platforms: linux/amd64
           load: true
           tags: udf-ci:local
-          cache-from: type=gha,scope=udf-native-toolchain
-          cache-to: type=gha,scope=udf-native-toolchain,mode=max,ignore-error=true
+          # The fresh publisher owns main's baseline; approved PRs save branch-local caches.
+          cache-from: type=gha,version=2,scope=udf-native-toolchain-amd64,timeout=2m
+          cache-to: >-
+            ${{ startsWith(github.ref, 'refs/heads/pull-request/') &&
+                'type=gha,version=2,scope=udf-native-toolchain-amd64,mode=max,timeout=2m,ignore-error=true' || '' }}
         env:
           DOCKER_BUILD_RECORD_RETENTION_DAYS: '2'
       - name: Cache Maven dependencies
