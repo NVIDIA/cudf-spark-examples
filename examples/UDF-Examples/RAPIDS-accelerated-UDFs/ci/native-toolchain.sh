@@ -18,10 +18,18 @@ set -euo pipefail
 
 context=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 checksum=$(sha256sum "$context/Dockerfile" | cut -d ' ' -f 1)
-image="ghcr.io/${GITHUB_REPOSITORY,,}/udf-native-toolchain"
+image_name=udf-native-toolchain
+image="ghcr.io/${GITHUB_REPOSITORY,,}/$image_name"
 tag="$image:dockerfile-$checksum"
 
 case "${1:-}" in
+  config)
+    # Keep the exact Dockerfile checksum tag consumed by the existing pull path.
+    jq -cn --arg image "$image_name" --arg tag "dockerfile-$checksum" --arg context "$context" '{
+      image: $image, tag: $tag, context: $context, dockerfile: ($context + "/Dockerfile"),
+      platform: "linux/amd64", "smoke-test": ($context + "/ci/native-toolchain-smoke.sh")
+    }'
+    ;;
   pull)
     # A new Dockerfile builds locally until its image is published.
     if timeout 5m docker pull --platform linux/amd64 "$tag"; then
@@ -41,9 +49,7 @@ case "${1:-}" in
       --label "org.opencontainers.image.revision=$GITHUB_SHA" \
       --tag udf-ci:local "$context"
 
-    docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
-      -v "$context:/udf:ro" -w /udf \
-      --entrypoint /bin/bash udf-ci:local ci/build-udfs.sh smoke
+    bash "$context/ci/native-toolchain-smoke.sh" udf-ci:local linux/amd64
     ;;
   publish)
     anonymous_config=$(mktemp -d)
@@ -68,7 +74,7 @@ case "${1:-}" in
     printf 'Published %s from %s.\n' "$tag" "$reference" >> "$GITHUB_STEP_SUMMARY"
     ;;
   *)
-    echo "Usage: $0 {pull|refresh|publish}" >&2
+    echo "Usage: $0 {config|pull|refresh|publish}" >&2
     exit 2
     ;;
 esac

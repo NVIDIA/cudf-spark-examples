@@ -27,6 +27,7 @@ on:
       - .github/workflows/udf-native-image.yml
       - examples/UDF-Examples/RAPIDS-accelerated-UDFs/Dockerfile
       - examples/UDF-Examples/RAPIDS-accelerated-UDFs/ci/native-toolchain.sh
+      - examples/UDF-Examples/RAPIDS-accelerated-UDFs/ci/native-toolchain-smoke.sh
       - examples/UDF-Examples/RAPIDS-accelerated-UDFs/ci/build-udfs.sh
 
 permissions:
@@ -54,10 +55,14 @@ jobs:
           persist-credentials: false
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4.4.1
-      - name: Build and smoke-test native toolchain
-        run: bash examples/UDF-Examples/RAPIDS-accelerated-UDFs/ci/native-toolchain.sh refresh
-      - name: Publish and verify anonymous access
-        env:
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GHCR_USER: ${{ github.actor }}
-        run: bash examples/UDF-Examples/RAPIDS-accelerated-UDFs/ci/native-toolchain.sh publish
+      - name: Resolve native image configuration
+        id: image
+        run: |
+          config=$(bash examples/UDF-Examples/RAPIDS-accelerated-UDFs/ci/native-toolchain.sh config)
+          printf 'config=%s\n' "$config" >> "$GITHUB_OUTPUT"
+      - name: Build, verify and publish native toolchain
+        uses: NVIDIA/spark-rapids-common/container-image@main
+        with:
+          config: ${{ steps.image.outputs.config }}
+          publish: 'true'
+          token: ${{ secrets.GITHUB_TOKEN }}
