@@ -60,6 +60,9 @@ jobs:
         id: image
         run: |
           config=$(bash examples/UDF-Examples/RAPIDS-accelerated-UDFs/ci/native-toolchain.sh config)
+          # Keep workflow-specific caching out of the image metadata helper.
+          config=$(jq -c \
+            '."cache-to" = ["type=gha,version=2,scope=udf-native-toolchain-amd64,mode=max,timeout=2m,ignore-error=true"]' <<< "$config")
           printf 'config=%s\n' "$config" >> "$GITHUB_OUTPUT"
       - name: Build, verify and publish native toolchain
         uses: NVIDIA/spark-rapids-common/container-image@main
