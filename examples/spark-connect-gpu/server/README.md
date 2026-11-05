@@ -150,7 +150,7 @@ path. Otherwise, we use variables starting with `local_`.
 
 ### Spark Connect Server
 - **Image**: Custom build based on `apache/spark:4.0.0` with the cuDF plugin for ETL and Spark-Rapids-ML for ML
-- **cuDF plugin version**: 26.08.0 for CUDA 12
+- **cuDF plugin version**: 26.10.0 for CUDA 12
 - **Ports**: 15002 (gRPC), 4040 (Driver UI)
 - **Configuration**: Optimized for GPU acceleration with memory management
 
