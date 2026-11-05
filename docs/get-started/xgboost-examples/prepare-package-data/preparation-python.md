@@ -5,7 +5,7 @@ For simplicity export the location to these jars. All examples assume the packag
 ### Download the jars
 
 Download the NVIDIA cuDF plugin for Apache Spark jar
-  * [cuDF plugin jar](https://repo1.maven.org/maven2/com/nvidia/rapids-4-spark_2.12/26.10.0/rapids-4-spark_2.12-26.10.0.jar)
+  * [cuDF plugin jar](https://repo1.maven.org/maven2/com/nvidia/rapids-4-spark_2.12/26.12.0/rapids-4-spark_2.12-26.12.0.jar)
 
 ### Build XGBoost Python Examples
 

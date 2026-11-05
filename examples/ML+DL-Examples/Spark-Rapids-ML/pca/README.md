@@ -10,7 +10,7 @@ Please refer to the Spark-Rapids-ML [README](https://github.com/NVIDIA/spark-rap
 ## Download the NVIDIA cuDF plugin for Apache Spark jar from Maven Central
 
 Download the [cuDF plugin](https://nvidia.github.io/cudf-spark/docs/download.html).
-To run this example with cuDF plugin version 26.10.0, download the jar from Maven Central: [rapids-4-spark_2.12-26.10.0.jar](https://repo1.maven.org/maven2/com/nvidia/rapids-4-spark_2.12/26.10.0/rapids-4-spark_2.12-26.10.0.jar).
+To run this example with cuDF plugin version 26.12.0, download the jar from Maven Central: [rapids-4-spark_2.12-26.12.0.jar](https://repo1.maven.org/maven2/com/nvidia/rapids-4-spark_2.12/26.12.0/rapids-4-spark_2.12-26.12.0.jar).
 
 ## Running the Notebooks
 
