@@ -15,6 +15,7 @@
 #
 
 # A container that can be used to build UDF native code against libcudf
+# Test-only: change the recipe fingerprint to exercise PR layer-cache fallback.
 ARG CUDA_VERSION=12.9.1
 ARG LINUX_VERSION=rockylinux8
 
