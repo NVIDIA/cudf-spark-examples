@@ -25,7 +25,7 @@ set(RAPIDS_CMAKE_CPM_OVERRIDE_VERSION_FILE "" CACHE FILEPATH
     "rapids-cmake versions.json override matching the prebuilt libcudf.so")
 string(LENGTH "${RAPIDS_CMAKE_BRANCH}" RAPIDS_CMAKE_REF_LENGTH)
 if(RAPIDS_CMAKE_REF_LENGTH EQUAL 40 AND RAPIDS_CMAKE_BRANCH MATCHES "^[0-9a-fA-F]+$")
-    set(rapids-cmake-branch "main")
+    set(rapids-cmake-branch "release/26.10")
     set(rapids-cmake-sha "${RAPIDS_CMAKE_BRANCH}")
     set(rapids-cmake-fetch-via-git ON)
 else()
