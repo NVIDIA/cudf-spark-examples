@@ -24,7 +24,7 @@
     <description>Sample implementations of GPU-accelerated user-defined functions
         for use with the NVIDIA cuDF plugin for Apache Spark
     </description>
-    <version>26.10.0-SNAPSHOT</version>
+    <version>26.12.0-SNAPSHOT</version>
 
     <properties>
         <maven.compiler.source>1.8</maven.compiler.source>
