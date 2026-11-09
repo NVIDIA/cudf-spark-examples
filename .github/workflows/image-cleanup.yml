@@ -15,7 +15,8 @@
 name: Image cleanup
 on:
   schedule:
-    - cron: '17 5 * * 0'
+    # Keep bounded cleanup aligned with daily image publication.
+    - cron: '17 5 * * *'
   workflow_dispatch:
     inputs:
       dry-run:
@@ -43,7 +44,7 @@ jobs:
       contents: read
       packages: write
     steps:
-      - name: Clean old build-only image versions
+      - name: Clean old image versions
         uses: NVIDIA/spark-rapids-common/ghcr-cleanup@main
         with:
           package: cudf-spark-examples/udf-native-toolchain
