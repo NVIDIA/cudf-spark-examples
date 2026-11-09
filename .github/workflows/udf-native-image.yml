@@ -35,8 +35,10 @@ permissions:
   contents: read
 
 concurrency:
+  # Shared with image-cleanup.yml; keep pending publications queued.
   group: udf-native-image
   cancel-in-progress: false
+  queue: max
 
 jobs:
   publish:
