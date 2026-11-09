@@ -7,11 +7,10 @@
   "suites": {
     "udf": {
       "enabled": true,
-      "comment": "Native and non-native UDF examples; skip Markdown-only changes.",
+      "comment": "Native and non-native UDFs, including toolchain inputs; skip Markdown and publisher/cleanup-only changes.",
       "paths": [
         "examples/UDF-Examples/RAPIDS-accelerated-UDFs/",
-        ".github/workflows/udf-build.yml",
-        ".github/workflows/udf-native-image.yml"
+        ".github/workflows/udf-build.yml"
       ],
       "exclude_paths": ["**/*.md"],
       "jobs": ["build", "gpu-test"]
