@@ -17,7 +17,6 @@
 package com.nvidia.spark.examples.textlines;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -43,41 +42,64 @@ import org.apache.spark.sql.vectorized.ColumnVector;
 import org.apache.spark.sql.vectorized.ColumnarBatch;
 
 /**
- * Reads the lines of one split into Arrow-backed columnar batches.
+ * Reads the lines of the splits of one partition into Arrow-backed columnar batches.
  *
  * Each batch gets new vectors, and the previous batch is closed when Spark asks for the next one,
  * so a consumer never sees its buffers change. The batch limits keep every Arrow buffer at or
  * below {@code maxBatchBytes} (2 MiB by default) for typical lines.
  */
 final class TextLinesColumnarReader implements PartitionReader<ColumnarBatch> {
-  private final BufferAllocator allocator = new RootAllocator();
-  private final LineRecordReader lines = new LineRecordReader();
+  // Shared and never closed. Spark 4.1 and later close a reader as soon as its input ends, while
+  // a consumer may still hold references to the buffers of its last batches; closing the
+  // allocator then would fail with a memory leak error. Arrow frees each buffer when its last
+  // reference is released.
+  private static final BufferAllocator ALLOCATOR = new RootAllocator();
+
+  private final Configuration conf;
+  private final TextSplitPartition partition;
   private final String[] columns;
   private final int maxBatchRows;
   private final long maxBatchBytes;
+  private int nextSplit;
+  private LineRecordReader lines;
   // A line read past the end of the previous batch
   private boolean pending;
   private ColumnarBatch batch;
 
   TextLinesColumnarReader(Configuration conf, TextSplitPartition partition, StructType required,
       int maxBatchRows, long maxBatchBytes) {
+    this.conf = conf;
+    this.partition = partition;
     this.columns = required.fieldNames();
     this.maxBatchRows = maxBatchRows;
     this.maxBatchBytes = maxBatchBytes;
-    FileSplit split = new FileSplit(new Path(partition.path), partition.start, partition.length,
-        new String[0]);
-    try {
+  }
+
+  // Moves to the next line, opening the next split when the current one ends.
+  private boolean nextLine() throws IOException {
+    while (true) {
+      if (lines != null && lines.nextKeyValue()) {
+        return true;
+      }
+      if (lines != null) {
+        lines.close();
+        lines = null;
+      }
+      if (nextSplit == partition.paths.length) {
+        return false;
+      }
+      FileSplit split = new FileSplit(new Path(partition.paths[nextSplit]),
+          partition.starts[nextSplit], partition.lengths[nextSplit], new String[0]);
+      nextSplit++;
+      lines = new LineRecordReader();
       lines.initialize(split, new TaskAttemptContextImpl(conf, new TaskAttemptID()));
-    } catch (IOException e) {
-      close();
-      throw new UncheckedIOException(e);
     }
   }
 
   @Override
   public boolean next() throws IOException {
     closeBatch();
-    if (!pending && !lines.nextKeyValue()) {
+    if (!pending && !nextLine()) {
       return false;
     }
     pending = false;
@@ -97,7 +119,7 @@ final class TextLinesColumnarReader implements PartitionReader<ColumnarBatch> {
         append(vectors, rows, lines.getCurrentKey(), line);
         rows++;
         bytes += line.getLength();
-      } while (lines.nextKeyValue());
+      } while (nextLine());
       ColumnVector[] result = new ColumnVector[vectors.size()];
       for (int i = 0; i < result.length; i++) {
         vectors.get(i).setValueCount(rows);
@@ -115,17 +137,17 @@ final class TextLinesColumnarReader implements PartitionReader<ColumnarBatch> {
   private FieldVector newVector(String name) {
     switch (name) {
       case TextLinesSource.OFFSET: {
-        BigIntVector v = new BigIntVector(name, allocator);
+        BigIntVector v = new BigIntVector(name, ALLOCATOR);
         v.allocateNew(Math.min(maxBatchRows, 1 << 12));
         return v;
       }
       case TextLinesSource.LINE: {
-        VarCharVector v = new VarCharVector(name, allocator);
+        VarCharVector v = new VarCharVector(name, ALLOCATOR);
         v.allocateNew(maxBatchBytes, Math.min(maxBatchRows, 1 << 12));
         return v;
       }
       case TextLinesSource.BYTES: {
-        VarBinaryVector v = new VarBinaryVector(name, allocator);
+        VarBinaryVector v = new VarBinaryVector(name, ALLOCATOR);
         v.allocateNew(maxBatchBytes, Math.min(maxBatchRows, 1 << 12));
         return v;
       }
@@ -160,14 +182,11 @@ final class TextLinesColumnarReader implements PartitionReader<ColumnarBatch> {
   }
 
   @Override
-  public void close() {
-    try {
-      closeBatch();
+  public void close() throws IOException {
+    closeBatch();
+    if (lines != null) {
       lines.close();
-    } catch (IOException e) {
-      throw new UncheckedIOException(e);
-    } finally {
-      allocator.close();
+      lines = null;
     }
   }
 }

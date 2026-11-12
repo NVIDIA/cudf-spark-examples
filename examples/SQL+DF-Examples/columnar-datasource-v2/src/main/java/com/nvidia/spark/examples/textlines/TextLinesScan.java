@@ -18,7 +18,9 @@ package com.nvidia.spark.examples.textlines;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hadoop.conf.Configuration;
@@ -39,10 +41,11 @@ import org.apache.spark.sql.connector.read.Scan;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
-/** Plans one input partition per Hadoop text split. */
+/** Splits the files like Hadoop's TextInputFormat and packs the splits into partitions. */
 final class TextLinesScan implements Scan, Batch {
   private final CaseInsensitiveStringMap options;
   private final StructType required;
+  private Configuration hadoopConf;
   private InputPartition[] partitions;
   private PartitionReaderFactory readerFactory;
 
@@ -83,6 +86,20 @@ final class TextLinesScan implements Scan, Batch {
     }
   }
 
+  // Like Spark's file sources: the session's Hadoop settings, such as those set with
+  // spark.conf.set, and the options of this read, such as fs.s3a.endpoint.
+  private Configuration hadoopConf() {
+    if (hadoopConf == null) {
+      hadoopConf = SparkSession.active().sessionState().newHadoopConf();
+      for (Map.Entry<String, String> e : options.asCaseSensitiveMap().entrySet()) {
+        if (!e.getKey().equalsIgnoreCase("path") && !e.getKey().equalsIgnoreCase("paths")) {
+          hadoopConf.set(e.getKey(), e.getValue());
+        }
+      }
+    }
+    return hadoopConf;
+  }
+
   // Spark may call these several times while planning; list and split the input only once.
   @Override
   public synchronized InputPartition[] planInputPartitions() {
@@ -97,7 +114,7 @@ final class TextLinesScan implements Scan, Batch {
     if (readerFactory == null) {
       SparkSession spark = SparkSession.active();
       Broadcast<SerializableConf> conf = JavaSparkContext.fromSparkContext(spark.sparkContext())
-          .broadcast(new SerializableConf(spark.sparkContext().hadoopConfiguration()));
+          .broadcast(new SerializableConf(hadoopConf()));
       // The defaults keep each Arrow buffer at or below 2 MiB, see the README.
       readerFactory = new TextLinesReaderFactory(conf, required,
           options.getInt("maxBatchRows", 1 << 18),
@@ -108,25 +125,40 @@ final class TextLinesScan implements Scan, Batch {
 
   private InputPartition[] computePartitions() {
     SparkSession spark = SparkSession.active();
-    Configuration conf = new Configuration(spark.sparkContext().hadoopConfiguration());
-    long maxSplitBytes = JavaUtils.byteStringAsBytes(options.getOrDefault("maxPartitionBytes",
-        spark.conf().get("spark.sql.files.maxPartitionBytes")));
+    long maxPartitionBytes = JavaUtils.byteStringAsBytes(options.getOrDefault(
+        "maxPartitionBytes", spark.conf().get("spark.sql.files.maxPartitionBytes")));
+    long openCost = JavaUtils.byteStringAsBytes(
+        spark.conf().get("spark.sql.files.openCostInBytes"));
     List<InputSplit> splits;
     try {
-      Job job = Job.getInstance(conf);
+      Job job = Job.getInstance(new Configuration(hadoopConf()));
       for (String path : paths()) {
         FileInputFormat.addInputPath(job, new Path(path));
       }
-      FileInputFormat.setMaxInputSplitSize(job, maxSplitBytes);
+      FileInputFormat.setMaxInputSplitSize(job, maxPartitionBytes);
       // TextInputFormat keeps compressed files that cannot be split in one piece.
       splits = new TextInputFormat().getSplits(job);
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
-    InputPartition[] result = new InputPartition[splits.size()];
-    for (int i = 0; i < result.length; i++) {
-      result[i] = TextSplitPartition.of((FileSplit) splits.get(i));
+    // Like Spark's file sources, pack small splits into one partition, counting each split as
+    // at least openCostInBytes, so that a task builds GPU batches of a useful size.
+    List<InputPartition> result = new ArrayList<>();
+    List<FileSplit> current = new ArrayList<>();
+    long currentBytes = 0;
+    for (InputSplit split : splits) {
+      FileSplit fileSplit = (FileSplit) split;
+      if (!current.isEmpty() && currentBytes + fileSplit.getLength() > maxPartitionBytes) {
+        result.add(TextSplitPartition.of(current));
+        current = new ArrayList<>();
+        currentBytes = 0;
+      }
+      current.add(fileSplit);
+      currentBytes += fileSplit.getLength() + openCost;
     }
-    return result;
+    if (!current.isEmpty()) {
+      result.add(TextSplitPartition.of(current));
+    }
+    return result.toArray(new InputPartition[0]);
   }
 }

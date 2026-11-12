@@ -17,7 +17,7 @@
 """Reads text files with the textlines source and prints the physical plan.
 
 Usage: spark-submit --jars <plugin jar>,<example jar> demo.py <input path>
-If the input path does not exist, a small sample is written there first.
+If the local input path does not exist, a small sample is written there first.
 """
 
 import os

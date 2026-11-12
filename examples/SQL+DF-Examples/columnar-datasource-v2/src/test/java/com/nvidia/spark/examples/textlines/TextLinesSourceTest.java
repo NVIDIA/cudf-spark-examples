@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.apache.spark.sql.DataFrameReader;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -38,7 +39,7 @@ import org.junit.Test;
 public class TextLinesSourceTest {
   private static SparkSession spark;
   private static File dir;
-  private static List<File> files = new ArrayList<>();
+  private static final List<File> files = new ArrayList<>();
 
   @BeforeClass
   public static void setUp() throws IOException {
@@ -74,13 +75,16 @@ public class TextLinesSourceTest {
   }
 
   // Small splits and batches, so lines cross split and batch boundaries.
-  private Dataset<Row> read(String path, boolean includeBytes) {
+  private DataFrameReader reader(boolean includeBytes) {
     return spark.read().format("textlines")
         .option("maxPartitionBytes", "64k")
         .option("maxBatchBytes", "16k")
         .option("maxBatchRows", "1000")
-        .option("includeBytes", String.valueOf(includeBytes))
-        .load(path);
+        .option("includeBytes", String.valueOf(includeBytes));
+  }
+
+  private Dataset<Row> read(String path, boolean includeBytes) {
+    return reader(includeBytes).load(path);
   }
 
   @Test
@@ -92,6 +96,36 @@ public class TextLinesSourceTest {
     assertEquals(expected.count(), lines.count());
     assertEquals(0, expected.exceptAll(lines.select("line")).count());
     assertEquals(0, lines.select("line").exceptAll(expected).count());
+  }
+
+  @Test
+  public void packsSmallFilesIntoOnePartition() {
+    // All three files, each counted with spark.sql.files.openCostInBytes (4 MiB), fit in 128m
+    Dataset<Row> lines = spark.read().format("textlines")
+        .option("maxPartitionBytes", "128m")
+        .option("maxBatchBytes", "16k")
+        .load(dir.getPath());
+    assertEquals(1, lines.rdd().getNumPartitions());
+    Dataset<Row> expected = spark.read().text(dir.getPath());
+    assertEquals(0, expected.exceptAll(lines.select("line")).count());
+    assertEquals(0, lines.select("line").exceptAll(expected).count());
+  }
+
+  @Test
+  public void usesHadoopSettingsOfTheSessionAndTheRead() {
+    // A minimum split size larger than a file keeps each file in one split. A file is larger
+    // than maxPartitionBytes, so each file then gets its own partition.
+    String minSplit = "mapreduce.input.fileinputformat.split.minsize";
+    String oneGiB = String.valueOf(1L << 30);
+    assertTrue(read(dir.getPath(), false).rdd().getNumPartitions() > files.size());
+    assertEquals(files.size(),
+        reader(false).option(minSplit, oneGiB).load(dir.getPath()).rdd().getNumPartitions());
+    spark.conf().set(minSplit, oneGiB);
+    try {
+      assertEquals(files.size(), read(dir.getPath(), false).rdd().getNumPartitions());
+    } finally {
+      spark.conf().unset(minSplit);
+    }
   }
 
   @Test

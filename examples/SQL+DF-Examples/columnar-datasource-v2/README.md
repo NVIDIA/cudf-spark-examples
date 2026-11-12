@@ -13,8 +13,8 @@ the batches to the GPU.
 ## What the example shows
 
 - The DataSource V2 read path: `TableProvider`, `Table` with `SupportsRead`, `ScanBuilder` with
-  column pruning, `Scan`/`Batch`, one `InputPartition` per Hadoop split, and a
-  `PartitionReaderFactory` whose `supportColumnarReads` returns `true`.
+  column pruning, `Scan`/`Batch` with input partitions that pack Hadoop splits like Spark's file
+  sources, and a `PartitionReaderFactory` whose `supportColumnarReads` returns `true`.
 - A `PartitionReader<ColumnarBatch>` that fills Arrow vectors of three types: `BIGINT`, `STRING`
   and `BINARY`.
 - How the batches reach the GPU, and what to look for in the plan.
@@ -32,9 +32,12 @@ Options:
 | Option | Default | Description |
 |--------|---------|-------------|
 | `includeBytes` | `false` | Add the `bytes` column |
-| `maxPartitionBytes` | `spark.sql.files.maxPartitionBytes` | Largest split of a file |
+| `maxPartitionBytes` | `spark.sql.files.maxPartitionBytes` | Largest number of bytes in one partition |
 | `maxBatchBytes` | `2m` | Largest number of line bytes in one batch |
 | `maxBatchRows` | `262144` | Largest number of lines in one batch |
+
+Other options are passed to Hadoop, like the options of Spark's file sources, for example
+`fs.s3a.endpoint`.
 
 ## Build
 
@@ -44,8 +47,9 @@ Requires Java 8 or later and Maven. The unit tests run Spark locally on the CPU.
 mvn package
 ```
 
-This produces `target/columnar-datasource-v2-example_2.12-26.12.0-SNAPSHOT.jar`. The source only
-uses Spark APIs, so the jar does not depend on the cuDF plugin.
+This produces the jar `target/columnar-datasource-v2-example_2.12-<version>.jar`. The source only
+uses Spark APIs, so the jar does not depend on the cuDF plugin. The example is built against
+Spark 3.5.2 and was tested with Spark 3.5.2 and 4.2.0.
 
 ## Run
 
@@ -53,7 +57,7 @@ On the CPU:
 
 ```shell
 $SPARK_HOME/bin/spark-submit \
-  --jars target/columnar-datasource-v2-example_2.12-26.12.0-SNAPSHOT.jar \
+  --jars target/columnar-datasource-v2-example_2.12-<version>.jar \
   demo.py /tmp/textlines-demo
 ```
 
@@ -62,12 +66,12 @@ With the cuDF plugin, add the plugin jar and enable it, see the
 
 ```shell
 $SPARK_HOME/bin/spark-submit \
-  --jars rapids-4-spark_2.12-<version>-cuda12.jar,target/columnar-datasource-v2-example_2.12-26.12.0-SNAPSHOT.jar \
+  --jars rapids-4-spark_2.12-<version>-cuda12.jar,target/columnar-datasource-v2-example_2.12-<version>.jar \
   --conf spark.plugins=com.nvidia.spark.SQLPlugin \
   demo.py /tmp/textlines-demo
 ```
 
-[demo.py](demo.py) writes a small sample to the path if it does not exist, groups the lines by
+[demo.py](demo.py) writes a small sample to the local path if it does not exist, groups the lines by
 length, and prints the result and the final physical plan. In Scala or Python, the source is
 used like any other:
 
@@ -92,7 +96,8 @@ For comparison, `spark.read.text` returns rows, so its scan is followed by
 
 `HostColumnarToGpu` combines the host batches of a task into GPU batches of about
 `spark.rapids.sql.batchSizeBytes` and copies them to the GPU. So the batches of the source can be
-small; a few MiB each is enough.
+small; a few MiB each is enough. A task does not combine batches with other tasks, so the source
+packs small files into one partition, as Spark's file sources do.
 
 Starting with version 26.12, the plugin copies Arrow vectors of fixed-width, string and binary
 types into its host columns in bulk, one buffer at a time. Earlier versions read the same
@@ -109,10 +114,20 @@ Points that this example handles, and that matter for any columnar source:
   closes the previous batch when Spark asks for the next one, and does not refill vectors that
   a consumer may still read. Arrow buffers are reference counted, so a consumer that needs them
   longer keeps its own reference.
+- **Do not close the allocator with the reader.** Spark 4.1 and later close a reader as soon as
+  its input ends, while a consumer may still hold the buffers of its last batches, as plugin
+  versions before 26.12 do. Closing the Arrow allocator then fails with `Memory was leaked by
+  query`. The reader allocates from one allocator that is never closed; each buffer is freed
+  when its last reference is released.
 - **Keep Arrow buffers small.** With Spark 3.5, Arrow allocates buffers larger than 4 MiB outside
   its pool, and every such allocation is zero-filled. The default batch limits keep each buffer
   at or below 2 MiB. A source that needs larger buffers can use an Arrow
   `AllocationManager` that allocates with `malloc` instead.
+- **Use the Hadoop settings of the session and the read.** Like Spark's file sources,
+  [TextLinesScan](src/main/java/com/nvidia/spark/examples/textlines/TextLinesScan.java) starts
+  from `sessionState().newHadoopConf()`, which includes settings made with `spark.conf.set`, and
+  adds the options of the read, such as file system credentials.
+- **Pack small files.** A partition per small file gives many short tasks, and small GPU batches.
 - **Prune columns.** `SupportsPushDownRequiredColumns` lets the reader fill only the columns that
   the query reads. A query that reads no columns, such as `count()`, still gets batches with the
   row count.
