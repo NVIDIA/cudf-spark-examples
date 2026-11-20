@@ -25,6 +25,13 @@ SPEC = importlib.util.spec_from_file_location("extract_native_libs", SCRIPT_PATH
 EXTRACTOR = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(EXTRACTOR)
 
+# Independent frames from `zstd -c` on each part (including a short final chunk).
+PARTS = (b"libcudf" * 32, b"tail")
+FRAMES = (
+    bytes.fromhex("28b52ffd0458750000386c69626375646601005651c5085e72abfd"),
+    bytes.fromhex("28b52ffd04582100007461696cdd2bfacb"),
+)
+
 
 class ExtractNativeLibrariesTest(unittest.TestCase):
     def setUp(self):
@@ -46,6 +53,8 @@ class ExtractNativeLibrariesTest(unittest.TestCase):
         *,
         chunk_size=7,
         format_version="1",
+        compression=None,
+        stored_chunks=None,
         corrupt_crc_index=None,
         omit_property=None,
         root=None,
@@ -62,6 +71,8 @@ class ExtractNativeLibrariesTest(unittest.TestCase):
             "chunk.size": str(chunk_size),
             "chunk.count": str(len(chunks)),
         }
+        if compression is not None:
+            properties["chunk.compression"] = compression
         for index, chunk in enumerate(chunks):
             crc = binascii.crc32(chunk) & 0xFFFFFFFF
             if index == corrupt_crc_index:
@@ -73,7 +84,7 @@ class ExtractNativeLibrariesTest(unittest.TestCase):
         with zipfile.ZipFile(jar_path, "w") as archive:
             manifest = "".join(f"{key}={value}\n" for key, value in properties.items())
             archive.writestr(base + EXTRACTOR.MANIFEST_SUFFIX, manifest)
-            for index, chunk in enumerate(chunks):
+            for index, chunk in enumerate(chunks if stored_chunks is None else stored_chunks):
                 archive.writestr(
                     f"{base}{EXTRACTOR.CHUNK_DIRECTORY_SUFFIX}/{index:05d}", chunk
                 )
@@ -90,16 +101,47 @@ class ExtractNativeLibrariesTest(unittest.TestCase):
 
     def test_reconstructs_chunked_library(self):
         cudf_data = b"chunked libcudf data spanning several entries"
-        jar_path = self.write_chunked_jar(cudf_data)
         output_dir = self.root / "output"
+        for compression in (None, "none"):
+            with self.subTest(compression=compression):
+                jar_path = self.write_chunked_jar(cudf_data, compression=compression)
+                EXTRACTOR.extract_native_libraries(jar_path, output_dir)
+                self.assertEqual(cudf_data, (output_dir / "libcudf.so").read_bytes())
 
+    def test_reconstructs_zstd_chunks(self):
+        cudf_data = b"".join(PARTS)
+        jar_path = self.write_chunked_jar(
+            cudf_data, chunk_size=len(PARTS[0]), compression="zstd", stored_chunks=FRAMES
+        )
+        output_dir = self.root / "output"
         EXTRACTOR.extract_native_libraries(jar_path, output_dir)
-
         self.assertEqual(cudf_data, (output_dir / "libcudf.so").read_bytes())
+
+    def test_rejects_invalid_zstd_chunks_without_replacing_library(self):
+        output_dir = self.root / "output"
+        output_dir.mkdir()
+        installed = output_dir / "libcudf.so"
+        installed.write_bytes(b"previous library")
+        cases = [
+            ((FRAMES[0], FRAMES[1][:-1]), None, "Cannot decode zstd chunk .*00001"),
+            ((FRAMES[1], FRAMES[1]), None, "Invalid size for .*00000"),
+            (FRAMES, 1, "CRC32 mismatch for .*00001"),
+        ]
+        for stored, corrupt_crc, expected_error in cases:
+            with self.subTest(expected_error=expected_error):
+                jar = self.write_chunked_jar(
+                    b"".join(PARTS), chunk_size=len(PARTS[0]), compression="zstd",
+                    stored_chunks=stored, corrupt_crc_index=corrupt_crc,
+                )
+                with self.assertRaisesRegex(RuntimeError, expected_error):
+                    EXTRACTOR.extract_native_libraries(jar, output_dir)
+                self.assertEqual(installed.read_bytes(), b"previous library")
+                self.assertEqual(list(output_dir.iterdir()), [installed])
 
     def test_rejects_invalid_manifest_metadata(self):
         cases = [
             {"format_version": "2"},
+            {"compression": "unsupported"},
             {"omit_property": "library.size"},
             {"omit_property": "chunk.00000.crc32"},
         ]

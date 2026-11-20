@@ -135,6 +135,8 @@ from the `rapids-4-spark` jar. This is much faster!
 
 **Prerequisites:**
 - rapids-4-spark jar must be available in your local Maven repository
+- For jars with zstd-compressed native chunks, install the system `libzstd`
+  runtime. Jars with raw chunks or a single `libcudf.so` do not require it.
 
 **Steps:**
 

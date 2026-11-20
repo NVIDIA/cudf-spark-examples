@@ -24,6 +24,8 @@ entries such as amd64/Linux/libcudf.so.
 
 import argparse
 import binascii
+import ctypes
+import ctypes.util
 import os
 import shutil
 import tempfile
@@ -94,6 +96,37 @@ def extract_conventional_library(archive, entry_name, output_dir):
     print(f"Extracted {entry_name} -> {output_path}")
 
 
+def load_zstd():
+    # Use the system library; older Python versions in the build image have no zstd module.
+    name = ctypes.util.find_library("zstd")
+    if not name:
+        raise RuntimeError("Cannot decode zstd native chunks: install the libzstd runtime")
+    lib = ctypes.CDLL(name)
+    size = ctypes.c_size_t
+    lib.ZSTD_decompress.argtypes = [ctypes.c_void_p, size, ctypes.c_void_p, size]
+    lib.ZSTD_decompress.restype = size
+    lib.ZSTD_isError.argtypes = [size]
+    lib.ZSTD_isError.restype = ctypes.c_uint
+    lib.ZSTD_getErrorName.argtypes = [size]
+    lib.ZSTD_getErrorName.restype = ctypes.c_char_p
+    return lib
+
+
+def chunk_blocks(source, chunk_name, expected_size, zstd):
+    if zstd is None:
+        yield from iter(lambda: source.read(COPY_BUFFER_SIZE), b"")
+        return
+
+    # Each entry is one independent frame. Limit output to the manifest chunk size.
+    frame = source.read()
+    decoded = ctypes.create_string_buffer(expected_size)
+    length = zstd.ZSTD_decompress(decoded, expected_size, frame, len(frame))
+    if zstd.ZSTD_isError(length):
+        reason = zstd.ZSTD_getErrorName(length).decode()
+        raise RuntimeError(f"Cannot decode zstd chunk {chunk_name}: {reason}")
+    yield memoryview(decoded).cast("B")[:length]
+
+
 def reconstruct_chunked_library(archive, manifest_name, output_dir):
     library_entry = manifest_name[: -len(MANIFEST_SUFFIX)]
     library_name = os.path.basename(library_entry)
@@ -104,6 +137,11 @@ def reconstruct_chunked_library(archive, manifest_name, output_dir):
         raise RuntimeError(
             f"Unsupported native chunk format.version in {manifest_name}: {format_version}"
         )
+
+    compression = properties.get("chunk.compression", "none")
+    if compression not in ("none", "zstd"):
+        raise RuntimeError(f"Unsupported chunk.compression in {manifest_name}: {compression}")
+    zstd = load_zstd() if compression == "zstd" else None
 
     library_size = parse_positive_int(properties, "library.size", manifest_name)
     chunk_size = parse_positive_int(properties, "chunk.size", manifest_name)
@@ -143,10 +181,7 @@ def reconstruct_chunked_library(archive, manifest_name, output_dir):
                         f"Missing native library chunk {chunk_name}"
                     ) from error
                 with source:
-                    while True:
-                        data = source.read(COPY_BUFFER_SIZE)
-                        if not data:
-                            break
+                    for data in chunk_blocks(source, chunk_name, expected_size, zstd):
                         output.write(data)
                         actual_size += len(data)
                         actual_crc = binascii.crc32(data, actual_crc)
